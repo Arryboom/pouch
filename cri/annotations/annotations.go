@@ -35,6 +35,9 @@ const (
 	// MemorySwapExtendAnnotation is the extend annotation of memory swap
 	MemorySwapExtendAnnotation = "io.alibaba.pouch.resources.memory-swap"
 
+	// PidsLimitExtendAnnotation is the extend annotation of pids limit
+	PidsLimitExtendAnnotation = "io.alibaba.pouch.resources.pids-limit"
+
 	// CNIBandwidthIngress is the desired incoming bandwidth rate limits in bps.
 	CNIBandwidthIngress = "kubernetes.io/ingress-bandwidth"
 
