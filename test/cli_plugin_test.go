@@ -1546,3 +1546,20 @@ func (suite *PouchPluginSuite) TestInitWithAdminUid(c *check.C) {
 	res = command.PouchRun("exec", name, "sh", "-c", "cat /proc/1/status | grep Gid").Assert(c, icmd.Success)
 	c.Assert(util.PartialEqual(res.Stdout(), "555\n"), check.IsNil)
 }
+
+// TestVMModeUlimit tests in vm mode, set nofile should keep in limits.conf
+func (suite *PouchPluginSuite) TestVMModeUlimit(c *check.C) {
+	name := "TestVMModeUlimit"
+
+	res := command.PouchRun("run", "-d", "--env", "ali_run_mode=vm", "--ulimit", "nofile=20480:40960", "--name", name, alios7u)
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	cmd := "cat /etc/profile.d/pouchenv.sh"
+	out := command.PouchRun("exec", name, "bash", "-c", cmd).Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(out.Stdout(), "NOFILE_HARD_LIMIT=\"40960\""), check.IsNil)
+
+	cmd = "cat /etc/security/limits.conf | grep admin"
+	out = command.PouchRun("exec", name, "bash", "-c", cmd).Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(out.Stdout(), "40960"), check.IsNil)
+}
