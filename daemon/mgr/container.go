@@ -1737,7 +1737,7 @@ func (mgr *ContainerManager) attachCRILog(c *Container, logPath string) error {
 	}
 
 	// using symlink for json-file log
-	if cntrio.LogDriverName() == types.LogConfigLogDriverJSONFile {
+	if cfg := c.HostConfig.LogConfig; cfg != nil && cfg.LogDriver == types.LogConfigLogDriverJSONFile {
 		containerLog := path.Join(mgr.Store.Path(c.ID), "json.log")
 
 		_, err := os.Stat(containerLog)
