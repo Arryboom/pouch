@@ -1,7 +1,5 @@
 APIContainerPluginsSuite.TestContainerUpdateForApiPlugin
 APIContainerPluginsSuite.TestCpusetTrick
-PouchPanguImageSuite.TestPanguImageBasic
-PouchPanguImageSuite.TestRestartDaemon
 PouchPluginSuite.TestEnvSN
 PouchPluginSuite.TestLabelDiskQuotaAddOperate
 PouchPluginSuite.TestLabelDiskQuotaFull
