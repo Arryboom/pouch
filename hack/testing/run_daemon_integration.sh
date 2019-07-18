@@ -33,9 +33,17 @@ integration::run_daemon_test_cases() {
   pushd "${REPO_BASE}/test"
   local testcases total_case_num
   if grep -q "^ID=\"alios\"$" /etc/os-release; then
-    testcases=$(cat "${REPO_BASE}/test/testcase."{common,alios})
-    total_case_num=$(cat "${REPO_BASE}/test/testcase."{common,alios} | wc -l)
-    echo "start to run common test cases and alios specified cases"
+    if grep "\"default-runtime\".*:.*\"kata-runtime\"" /etc/pouch/config.json;
+    then
+      testcases=$(cat "${REPO_BASE}/test/testcase.kata")
+      # shellcheck disable=SC2002
+      total_case_num=$(cat "${REPO_BASE}/test/testcase.kata" | wc -l)
+      echo "start to run kata test cases"
+    else
+      testcases=$(cat "${REPO_BASE}/test/testcase."{common,alios})
+      total_case_num=$(cat "${REPO_BASE}/test/testcase."{common,alios} | wc -l)
+      echo "start to run common test cases and alios specified cases"
+    fi
   else
     testcases=$(cat "${REPO_BASE}/test/testcase.common")
     # shellcheck disable=SC2002
