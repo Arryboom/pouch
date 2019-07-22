@@ -93,6 +93,13 @@ func (c *Container) SetStatusDead() {
 	c.setStatusFlags(types.StatusDead)
 }
 
+// IsDead returns container is dead or not.
+// NOTE: ContainerMgmt.Remove action will set Dead to container's meta config
+// before removing the meta config json file.
+func (c *Container) IsDead() bool {
+	return c.State.Status == types.StatusDead
+}
+
 // SetStatusOOM sets a container to be status exit because of OOM.
 func (c *Container) SetStatusOOM() {
 	c.State.OOMKilled = true
