@@ -273,10 +273,12 @@ func UniqueStringSlice(s []string) []string {
 }
 
 // addEnvironment add pouch environment pouch_container_image and pouch_container_id
-func addEnvironment(image, id string, env []string) []string {
+func addEnvironment(image, id, runtime string, env []string) []string {
 	var res []string
 	for _, v := range env {
-		if strings.Contains(v, "pouch_container_image=") || strings.Contains(v, "pouch_container_id=") {
+		if strings.Contains(v, "pouch_container_image=") ||
+			strings.Contains(v, "pouch_container_id=") ||
+			strings.Contains(v, "ali_runtime_type") {
 			continue
 		}
 		res = append(res, v)
@@ -285,7 +287,7 @@ func addEnvironment(image, id string, env []string) []string {
 	pouchContainerImage := fmt.Sprintf("pouch_container_image=%s", image)
 	res = append(res, pouchContainerImage)
 	pouchContainerID := fmt.Sprintf("pouch_container_id=%s", id)
-	return append(res, pouchContainerID)
+	return append(res, pouchContainerID, fmt.Sprintf("ali_runtime_type=%s", runtime))
 }
 
 // isCopyPodHostsOn verify whether container is set copyPodHosts

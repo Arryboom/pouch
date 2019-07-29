@@ -40,14 +40,17 @@ func TestAddEnvironment(t *testing.T) {
 	image := "reg.docker.alibaba-inc.com/ali/os:7u2"
 	id := "dddddd"
 	env := []string{}
-	env = addEnvironment(image, id, env)
-	if len(env) != 2 {
+	env = addEnvironment(image, id, "runc", env)
+	if len(env) != 3 {
 		t.Fatalf("expect length 2, but got %d", len(env))
 	}
 	if env[0] != "pouch_container_image=reg.docker.alibaba-inc.com/ali/os:7u2" {
 		t.Fatalf("expect (pouch_container_image=reg.docker.alibaba-inc.com/ali/os:7u2), but got %s", env[0])
 	}
 	if env[1] != "pouch_container_id=dddddd" {
+		t.Fatalf("expect (pouch_container_id=dddddd), but got %s", env[0])
+	}
+	if env[2] != "ali_runtime_type=runc" {
 		t.Fatalf("expect (pouch_container_id=dddddd), but got %s", env[0])
 	}
 }
