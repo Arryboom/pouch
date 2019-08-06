@@ -1241,6 +1241,8 @@ message FilesystemUsage {
     // This may not equal InodesCapacity - InodesAvailable because the underlying
     // filesystem may also be used for purposes other than storing images.
     UInt64Value inodes_used = 4;
+    // FsUsage represents the filesystem disk usage
+    UInt64Value fs_usage = 100;
 }
 
 message ImageFsInfoResponse {

@@ -14,3 +14,4 @@ PouchRunSuite.TestRunAlikernelMemoryExtra
 PouchRunSuite.TestRunAlikernelMemoryForceEmptyCtl
 PouchRunSuite.TestRunAlikernelMemoryWmarkRatio
 PouchRunSuite.TestRunAlikernelScheLatSwitch
+PouchDaemonSuite.TestSnashotterDiskUsageCollector

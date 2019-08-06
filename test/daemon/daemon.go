@@ -26,6 +26,7 @@ const (
 	Listen           = "unix:///tmp/test/pouch/pouchd.sock"
 	StreamServerPort = "10020"
 	ContainerdAdd    = "/tmp/test/pouch/containerd.sock"
+	DefaultNS        = "default"
 	Pidfile          = "/tmp/test/pouch/pouch.pid"
 	ConfigFile       = "/tmp/test-config.json"
 )
@@ -50,6 +51,7 @@ type Config struct {
 	StreamServerPort string
 	HomeDir          string
 	ContainerdAddr   string
+	DefaultNS        string
 	Pidfile          string
 
 	// pid of pouchd
@@ -75,6 +77,7 @@ func NewConfig() Config {
 	result.StreamServerPort = StreamServerPort
 	result.HomeDir = HomeDir
 	result.ContainerdAddr = ContainerdAdd
+	result.DefaultNS = DefaultNS
 	result.Pidfile = Pidfile
 
 	result.timeout = 15
@@ -121,6 +124,9 @@ func (d *Config) StartDaemon() error {
 	}
 	if _, ok := d.Cfg["pidfile"]; !ok {
 		d.Cfg["pidfile"] = d.Pidfile
+	}
+	if _, ok := d.Cfg["default-namespace"]; !ok {
+		d.Cfg["default-namespace"] = d.DefaultNS
 	}
 	if _, ok := d.Cfg["cri-config"]; !ok {
 		d.Cfg["cri-config"] = map[string]string{

@@ -23,8 +23,8 @@ type Config struct {
 	StreamServerReusePort bool `json:"stream-server-reuse-port,omitempty"`
 	// CriStatsCollectPeriod specify the time duration (in time.Second) cri collect stats from containerd.
 	CriStatsCollectPeriod int `json:"cri-stats-collect-period,omitempty"`
-	// EnableCriStatsCollect specify whether cri collect stats from containerd.
-	EnableCriStatsCollect bool `json:"enable-cri-stats-collect,omitempty"`
+	// DisableCriStatsCollect specify whether cri collect stats from containerd.
+	DisableCriStatsCollect bool `json:"disable-cri-stats-collect,omitempty"`
 	// RuntimeConfigFile is a file to make the runtime config persistent.
 	RuntimeConfigFile string `json:"runtime-config-file"`
 }

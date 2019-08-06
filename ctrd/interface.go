@@ -43,6 +43,8 @@ type ContainerAPIClient interface {
 	ContainerPIDs(ctx context.Context, id string) ([]int, error)
 	// ContainerPID returns the container's init process id.
 	ContainerPID(ctx context.Context, id string) (int, error)
+	// ContainerStatus returns the status of container.
+	ContainerStatus(ctx context.Context, id string) (containerd.Status, error)
 	// ContainerStats returns stats of the container.
 	ContainerStats(ctx context.Context, id string) (*containerdtypes.Metric, error)
 	// ExecContainer executes a process in container.

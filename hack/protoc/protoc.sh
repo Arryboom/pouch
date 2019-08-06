@@ -11,8 +11,8 @@ set -o nounset
 DIR="$( cd "$( dirname "$0"  )" && pwd  )"/../..
 API_ROOT="${DIR}/cri/apis/v1alpha2"
 
-if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
-  echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
+if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3.6."* ]]; then
+  echo "Generating protobuf requires protoc 3.6.*. Please download and"
   echo "install the platform appropriate Protobuf package for your OS: "
   echo
   echo "  https://github.com/google/protobuf/releases"
@@ -22,11 +22,14 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 protoc::install_gen_gogo(){
-go get -u k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
-if ! which protoc-gen-gogo >/dev/null; then
-  echo "GOPATH is not in PATH"
-  exit 1
-fi
+  go get -d k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+  cd "$GOPATH/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
+  git checkout 277ef541eba73ba1630e889f21159040fcea9760
+  go install ./
+  if ! which protoc-gen-gogo >/dev/null; then
+    echo "GOPATH is not in PATH"
+    exit 1
+  fi
 }
 
 protoc::install_gen_doc(){

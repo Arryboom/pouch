@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +14,11 @@ import (
 	"time"
 
 	"github.com/alibaba/pouch/apis/types"
+	"github.com/alibaba/pouch/ctrd"
 	"github.com/alibaba/pouch/daemon/config"
+	"github.com/alibaba/pouch/daemon/containerio"
+	"github.com/alibaba/pouch/daemon/mgr"
+	"github.com/alibaba/pouch/pkg/errtypes"
 	"github.com/alibaba/pouch/test/command"
 	"github.com/alibaba/pouch/test/daemon"
 	"github.com/alibaba/pouch/test/daemonv2"
@@ -22,6 +27,7 @@ import (
 
 	"github.com/go-check/check"
 	"github.com/gotestyourself/gotestyourself/icmd"
+	"github.com/sirupsen/logrus"
 )
 
 // PouchDaemonSuite is the test suite for daemon.
@@ -616,4 +622,74 @@ func (suite *PouchDaemonSuite) TestUpdateDaemonWithDisableBridge(c *check.C) {
 	if strings.Contains(res.Stdout(), "bridge") {
 		c.Fatalf("failed to disable bridge network")
 	}
+}
+
+// TestSnashotterDiskUsageCollector checks CRI snapshotter disk usage function.
+func (suite *PouchDaemonSuite) TestSnashotterDiskUsageCollector(c *check.C) {
+	if !environment.IsDiskQuota() {
+		c.Skip("Host does not support disk quota")
+	}
+
+	dcfg, err := StartDefaultDaemon(nil)
+	c.Assert(err, check.IsNil)
+	defer dcfg.KillDaemon()
+
+	logrus.SetLevel(logrus.DebugLevel)
+
+	// pull image
+	RunWithSpecifiedDaemon(dcfg, "pull", busyboxImage).Assert(c, icmd.Success)
+
+	// run a container with 4KB data
+	cname := c.TestName()
+
+	content := strings.Repeat("abcd", 1024)
+
+	res := RunWithSpecifiedDaemon(dcfg, "run", "-d", "--net=none",
+		"--name", cname,
+		"-l", "DiskQuota=/=100K",
+		busyboxImage, "sh", "-c", fmt.Sprintf("echo %s > data.dat && top", content))
+	defer ensureContainerNotExist(dcfg, cname)
+
+	res.Assert(c, icmd.Success)
+	cid := strings.TrimSpace(res.Combined())
+
+	// make sure that container is up
+	running := false
+	for count := 0; count < 10; count++ {
+		res := RunWithSpecifiedDaemon(dcfg, "inspect", cname, "-f", "{{.State.Running}}")
+		res.Assert(c, icmd.Success)
+
+		output := strings.TrimSpace(res.Combined())
+		if strings.ToLower(output) == "true" {
+			running = true
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	c.Assert(running, check.Equals, true)
+
+	// init containerd client API
+	ctrdClient, err := ctrd.NewClient(
+		ctrd.WithRPCAddr(dcfg.ContainerdAddr),
+		ctrd.WithDefaultNamespace(dcfg.DefaultNS),
+	)
+	c.Assert(err, check.IsNil)
+
+	// load container into ctrdClient
+	c.Assert(ctrdClient.RecoverContainer(context.TODO(), cid, containerio.NewIO(cid, false)), check.IsNil)
+
+	// busybox top container should use space between 4KB and 100KB
+	kb4, kb100 := int64(1024*4), int64(1024*100)
+	syncer := mgr.NewSnapshotsSyncer(nil, ctrdClient, 10*time.Second)
+	usage, percent, err := syncer.FetchActiveOverlaySnapshotDiskUsage(context.TODO(), cid)
+	c.Assert(err, check.IsNil)
+	c.Assert(usage.Size >= kb4 && usage.Size <= kb100, check.Equals, true)
+	c.Assert(percent >= 4, check.Equals, true)
+
+	// stop container
+	RunWithSpecifiedDaemon(dcfg, "stop", cid).Assert(c, icmd.Success)
+
+	// fetch should fail
+	_, _, err = syncer.FetchActiveOverlaySnapshotDiskUsage(context.TODO(), cid)
+	c.Assert(errtypes.IsNotfound(err), check.Equals, true)
 }

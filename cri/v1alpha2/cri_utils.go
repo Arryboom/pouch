@@ -1089,7 +1089,7 @@ func parseUserFromImageUser(id string) string {
 }
 
 func (c *CriManager) getContainerMetrics(ctx context.Context, meta *mgr.Container) (*runtime.ContainerStats, error) {
-	var usedBytes, inodesUsed uint64
+	var usedBytes, inodesUsed, usedPercent uint64
 
 	metadata, err := parseContainerName(meta.Name)
 	if err != nil {
@@ -1100,6 +1100,7 @@ func (c *CriManager) getContainerMetrics(ctx context.Context, meta *mgr.Containe
 	if err == nil {
 		usedBytes = sn.Size
 		inodesUsed = sn.Inodes
+		usedPercent = sn.UsagePercent
 	}
 
 	cs := &runtime.ContainerStats{}
@@ -1110,6 +1111,7 @@ func (c *CriManager) getContainerMetrics(ctx context.Context, meta *mgr.Containe
 		},
 		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
+		FsUsage:    &runtime.UInt64Value{Value: usedPercent},
 	}
 	labels, annotations := extractLabels(meta.Config.Labels)
 

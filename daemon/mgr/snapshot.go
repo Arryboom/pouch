@@ -3,14 +3,19 @@ package mgr
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/alibaba/pouch/ctrd"
-
 	"github.com/alibaba/pouch/pkg/errtypes"
 	"github.com/alibaba/pouch/pkg/log"
+
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 )
 
@@ -24,6 +29,8 @@ type Snapshot struct {
 	Size uint64
 	// Inodes is the number of inodes used by the snapshot
 	Inodes uint64
+	// UsagePercent is the percent of disk used by snapshotter
+	UsagePercent uint64
 	// Timestamp is latest update time (in nanoseconds) of the snapshot
 	// information.
 	Timestamp int64
@@ -83,8 +90,8 @@ type SnapshotsSyncer struct {
 	syncPeriod time.Duration
 }
 
-// newSnapshotsSyncer creates a snapshot syncer.
-func newSnapshotsSyncer(store *SnapshotStore, cli ctrd.APIClient, period time.Duration) *SnapshotsSyncer {
+// NewSnapshotsSyncer creates a snapshot syncer.
+func NewSnapshotsSyncer(store *SnapshotStore, cli ctrd.APIClient, period time.Duration) *SnapshotsSyncer {
 	return &SnapshotsSyncer{
 		store:      store,
 		client:     cli,
@@ -119,6 +126,8 @@ func (s *SnapshotsSyncer) Sync() error {
 	if err != nil {
 		return fmt.Errorf("failed to walk all snapshots: %v", err)
 	}
+
+	snapshotterTyp := ctrd.CurrentSnapshotterName(context.TODO())
 	for _, info := range infos {
 		sn, err := s.store.Get(info.Name)
 		if err == nil {
@@ -135,13 +144,36 @@ func (s *SnapshotsSyncer) Sync() error {
 			Kind:      info.Kind,
 			Timestamp: time.Now().UnixNano(),
 		}
-		usage, err := s.client.GetSnapshotUsage(context.Background(), info.Name)
+
+		var (
+			usage       snapshots.Usage
+			usedPercent uint64
+		)
+
+		switch snapshotterTyp {
+		case "overlayfs", "overlay1fs":
+			if sn.Kind == snapshots.KindActive {
+				usage, usedPercent, err = s.FetchActiveOverlaySnapshotDiskUsage(context.TODO(), info.Name)
+				if err != nil && (errtypes.IsNotfound(err) || errtypes.IsPreCheckFailed(err)) {
+					// when the container stops the container doesn't contain df command
+					// the error should be not found or not running. we should skip the error
+					log.With(nil).Debugf("failed to get usage for overlay kind of snapshot %q: %v", info.Name, err)
+					continue
+				}
+			} else {
+				usage, err = s.client.GetSnapshotUsage(context.Background(), info.Name)
+			}
+		default:
+			usage, err = s.client.GetSnapshotUsage(context.Background(), info.Name)
+		}
 		if err != nil {
 			log.With(nil).Warnf("failed to get usage for snapshot %q: %v", info.Name, err)
 			continue
 		}
+
 		sn.Size = uint64(usage.Size)
 		sn.Inodes = uint64(usage.Inodes)
+		sn.UsagePercent = usedPercent
 		s.store.Add(sn)
 	}
 	for _, sn := range s.store.List() {
@@ -156,4 +188,94 @@ func (s *SnapshotsSyncer) Sync() error {
 	}
 
 	return nil
+}
+
+// FetchActiveOverlaySnapshotDiskUsage uses nsenter to get container disk usage.
+//
+// NOTE: if there is no disk quota to limit container, the result will be the
+// the same to do df in host.
+func (s *SnapshotsSyncer) FetchActiveOverlaySnapshotDiskUsage(ctx context.Context, key string) (snapshots.Usage, uint64, error) {
+	pid, err := s.client.ContainerPID(ctx, key)
+	if err != nil {
+		return snapshots.Usage{}, 0, err
+	}
+
+	status, err := s.client.ContainerStatus(ctx, key)
+	if err != nil {
+		return snapshots.Usage{}, 0, err
+	}
+
+	if status.Status != containerd.Running {
+		return snapshots.Usage{}, 0, errors.Wrapf(errtypes.ErrPreCheckFailed, "container(%s) is not running", key)
+	}
+	return s.doDiskUsageByNsenter(ctx, pid)
+}
+
+func (s *SnapshotsSyncer) doDiskUsageByNsenter(ctx context.Context, pid int) (snapshots.Usage, uint64, error) {
+	args := []string{
+		"--target", strconv.Itoa(pid),
+		"--mount", "--uts", "--ipc", "--net", "--pid",
+		"/bin/df", "-h", "/",
+	}
+
+	res, err := exec.CommandContext(ctx, "nsenter", args...).CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(res), "No such file or directory") ||
+			strings.Contains(err.Error(), "No such file or directory") {
+
+			return snapshots.Usage{}, 0, errors.Wrapf(errtypes.ErrNotfound, "failed to exec nsenter: %v\n%s", err, string(res))
+		}
+		return snapshots.Usage{}, 0, errors.Wrapf(err, "failed to exec df: %s", string(res))
+	}
+	output := strings.TrimSpace(string(res))
+
+	log.With(ctx).Debugf("nsenter %v:\n%s", args, output)
+
+	lines := strings.Split(output, "\n")
+	if len(lines) != 2 {
+		return snapshots.Usage{}, 0, fmt.Errorf("df should return header and data:\n %s", output)
+	}
+
+	// NOTE: since different linux dist might use different version df, use
+	// hash4Idx to store the index for the header instead of using
+	// df --output=fieldlist
+	hash4Idx := map[string]int{}
+	header := strings.TrimSpace(lines[0])
+	if header == "" {
+		return snapshots.Usage{}, 0, fmt.Errorf("df return no header:\n%s", output)
+	}
+
+	for idx, key := range strings.Fields(header) {
+		hash4Idx[strings.ToLower(key)] = idx
+	}
+
+	usedIdx, ok := hash4Idx["used"]
+	if !ok {
+		return snapshots.Usage{}, 0, fmt.Errorf("df return header without used colum:\n%s", output)
+	}
+
+	usedPercentIdx, ok := hash4Idx["use%"]
+	if !ok {
+		return snapshots.Usage{}, 0, fmt.Errorf("df return header without used%% colum:\n%s", output)
+	}
+
+	data := strings.TrimSpace(lines[1])
+	values := strings.Fields(data)
+	usedValue, err := units.RAMInBytes(values[usedIdx])
+	if err != nil {
+		return snapshots.Usage{}, 0, fmt.Errorf("failed to parse df return data: %v\n%s", err, output)
+	}
+
+	percentValue := values[usedPercentIdx]
+	usedPercentValue, err := strconv.Atoi(percentValue[:len(percentValue)-1])
+	if err != nil {
+		return snapshots.Usage{}, 0, fmt.Errorf("failed to parse df return used percent data: %v\n%s", err, output)
+	}
+	if usedPercentValue < 0 || usedPercentValue > 100 {
+		return snapshots.Usage{}, 0, fmt.Errorf("invalid percent data: %v\n%s", err, output)
+	}
+
+	return snapshots.Usage{
+		Size: usedValue,
+	}, uint64(usedPercentValue), nil
 }

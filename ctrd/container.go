@@ -266,6 +266,34 @@ func (c *Client) containerPIDs(ctx context.Context, id string) ([]int, error) {
 	return list, nil
 }
 
+// ContainerStatus returns the status of container.
+func (c *Client) ContainerStatus(ctx context.Context, id string) (containerd.Status, error) {
+	status, err := c.containerStatus(ctx, id)
+	if err != nil {
+		return status, convertCtrdErr(err)
+	}
+	return status, nil
+}
+
+// containerStatus returns the status of container.
+func (c *Client) containerStatus(ctx context.Context, id string) (containerd.Status, error) {
+	if !c.lock.TrylockWithRetry(ctx, id) {
+		return containerd.Status{}, errtypes.ErrLockfailed
+	}
+	defer c.lock.Unlock(id)
+
+	pack, err := c.watch.get(id)
+	if err != nil {
+		return containerd.Status{}, err
+	}
+
+	status, err := pack.task.Status(ctx)
+	if err != nil {
+		return containerd.Status{}, errors.Wrap(err, "failed to get task's status")
+	}
+	return status, nil
+}
+
 // ProbeContainer probe the container's status, if timeout <= 0, will block to receive message.
 func (c *Client) ProbeContainer(ctx context.Context, id string, timeout time.Duration) *Message {
 	ch := c.watch.notify(id)

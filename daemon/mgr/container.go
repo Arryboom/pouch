@@ -2097,7 +2097,7 @@ func (mgr *ContainerManager) execProcessGC() {
 
 // NewSnapshotsSyncer creates a snapshot syncer.
 func (mgr *ContainerManager) NewSnapshotsSyncer(snapshotStore *SnapshotStore, duration time.Duration) *SnapshotsSyncer {
-	return newSnapshotsSyncer(snapshotStore, mgr.Client, duration)
+	return NewSnapshotsSyncer(snapshotStore, mgr.Client, duration)
 }
 
 func (mgr *ContainerManager) generateContainerID(specificID string) (string, error) {

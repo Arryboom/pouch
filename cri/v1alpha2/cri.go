@@ -176,7 +176,7 @@ func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.Im
 	c.imageFSPath = imageFSPath(path.Join(config.HomeDir, "containerd/root"), ctrd.CurrentSnapshotterName(context.TODO()))
 	log.With(nil).Infof("Get image filesystem path %q", c.imageFSPath)
 
-	if config.CriConfig.EnableCriStatsCollect {
+	if !config.CriConfig.DisableCriStatsCollect {
 		period := config.CriConfig.CriStatsCollectPeriod
 		if period <= 0 {
 			return nil, fmt.Errorf("cri stats collect period should > 0")
