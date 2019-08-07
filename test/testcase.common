@@ -289,6 +289,7 @@ PouchPluginSuite.TestSetHostnameEnv
 PouchPluginSuite.TestShmSizeIsHalfOfMemory
 PouchPluginSuite.TestTrimPrefixContainerSlash
 PouchPluginSuite.TestUidFromIp
+PouchPluginSuite.TestInitWithAdminUid
 PouchPsSuite.TestPsAll
 PouchPsSuite.TestPsFilterEqual
 PouchPsSuite.TestPsFilterInvalid

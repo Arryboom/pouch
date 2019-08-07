@@ -1531,3 +1531,18 @@ func (suite *PouchPluginSuite) TestMtab(c *check.C) {
 	res = command.PouchRun("exec", name, "cat", "/etc/mtab").Assert(c, icmd.Success)
 	c.Assert(util.PartialEqual(res.Stdout(), "hugepages"), check.IsNil)
 }
+
+// TestInitWithAdminUid test -e ali_admin_uid passed, init process use admin
+// user should run with this uid
+func (suite *PouchPluginSuite) TestInitWithAdminUid(c *check.C) {
+	name := "TestInitWithAdminUid"
+	res := command.PouchRun("run", "-d", "-u", "admin", "-e", "ali_admin_uid=555", "--name", name, alios7u)
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	res = command.PouchRun("exec", name, "sh", "-c", "cat /proc/1/status | grep Uid").Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(res.Stdout(), "555\n"), check.IsNil)
+
+	res = command.PouchRun("exec", name, "sh", "-c", "cat /proc/1/status | grep Gid").Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(res.Stdout(), "555\n"), check.IsNil)
+}
