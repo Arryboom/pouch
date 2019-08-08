@@ -25,7 +25,7 @@ cni::install_cni() {
   if [ ! -d "${workdir}" ]; then
     mkdir -p "${workdir}"
     cd "${workdir}"
-    git clone https://${pkg}.git .
+    git clone http://gitlab.alibaba-inc.com/pouch/containernetworking-plugins.git .
   fi
   cd "${workdir}"
   git fetch --all
