@@ -986,6 +986,23 @@ func (mgr *ContainerManager) ensureRootFSMounted(rootfs string, snapData map[str
 	return mount.Mount(rootfs)
 }
 
+func (mgr *ContainerManager) destroyContainer(ctx context.Context, c *Container, timeout int64) (*ctrd.Message, error) {
+	msg, err := mgr.Client.DestroyContainer(ctx, c.ID, timeout)
+	if err != nil {
+		if errtypes.IsTimeout(err) || errtypes.IsNotfound(err) {
+			// if destroying container timeout, container may exits later.
+			// disable restart policy here.
+			c.HostConfig.RestartPolicy = nil
+			if e := c.Write(mgr.Store); e != nil {
+				log.With(ctx).Errorf("failed to set restartPolicy to none for killing-timeout container %q", c.ID)
+			}
+		}
+		return nil, err
+	}
+
+	return msg, nil
+}
+
 // Stop stops a running container.
 func (mgr *ContainerManager) Stop(ctx context.Context, name string, timeout int64) error {
 	c, err := mgr.container(name)
@@ -1031,13 +1048,16 @@ func (mgr *ContainerManager) stop(ctx context.Context, c *Container, timeout int
 		}
 	}()
 
-	id := c.ID
-	msg, err := mgr.Client.DestroyContainer(ctx, id, timeout)
+	_, err := mgr.destroyContainer(ctx, c, timeout)
 	if err != nil {
-		return errors.Wrapf(err, "failed to destroy container %s", id)
+		if errtypes.IsTimeout(err) || errtypes.IsNotfound(err) {
+			// don't make stopped status and release container network
+			return nil
+		}
+		return err
 	}
 
-	return mgr.markStoppedAndRelease(ctx, c, msg)
+	return nil
 }
 
 // Restart restarts a running container.
@@ -1403,7 +1423,7 @@ func (mgr *ContainerManager) Remove(ctx context.Context, name string, options *t
 
 	// if the container is running, force to stop it.
 	if c.IsRunningOrPaused() && options.Force {
-		_, err := mgr.Client.DestroyContainer(ctx, c.ID, c.StopTimeout())
+		_, err := mgr.destroyContainer(ctx, c, c.StopTimeout())
 		if err != nil && !errtypes.IsNotfound(err) {
 			return errors.Wrapf(err, "failed to destroy container %s when removing", c.ID)
 		}
@@ -1992,6 +2012,10 @@ func (mgr *ContainerManager) exitedAndRelease(id string, m *ctrd.Message, cleanu
 
 	c.Lock()
 	defer c.Unlock()
+
+	if c.State.Dead {
+		return nil
+	}
 
 	ctx := log.NewContext(context.Background(), map[string]interface{}{
 		"ContainerID": c.ID,

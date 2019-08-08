@@ -87,5 +87,5 @@ func (suite *APIContainerStopSuite) TestStopPausedContainer(c *check.C) {
 	StartContainerOk(c, cname)
 	PauseContainerOk(c, cname)
 	StopContainerOk(c, cname)
-	CheckContainerStatus(c, cname, "stopped")
+	CheckContainerStatus(c, cname, "exited")
 }

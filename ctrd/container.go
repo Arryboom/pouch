@@ -49,9 +49,7 @@ type containerPack struct {
 	task      containerd.Task
 
 	// client is to record which stream client the container connect with
-	client        *WrapperClient
-	skipStopHooks bool
-	l             sync.RWMutex
+	client *WrapperClient
 }
 
 // ContainerStats returns stats of the container.
@@ -451,17 +449,6 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 		return nil, nil
 	}
 
-	// if you call DestroyContainer to stop a container, will skip the hooks.
-	// the caller need to execute the all hooks.
-	pack.l.Lock()
-	pack.skipStopHooks = true
-	pack.l.Unlock()
-	defer func() {
-		pack.l.Lock()
-		pack.skipStopHooks = false
-		pack.l.Unlock()
-	}()
-
 	waitExit := func() *Message {
 		return c.ProbeContainer(ctx, id, time.Duration(timeout)*time.Second)
 	}
@@ -488,13 +475,15 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 		} else {
 			goto clean
 		}
+		return nil, err
 	}
 
 	// wait for the task to exit.
 	msg = waitExit()
 
 	if err := msg.RawError(); err != nil && errtypes.IsTimeout(err) {
-		log.With(ctx).Infof("send signal 9 to container")
+		log.With(ctx).WithField("container", id).Warningf("send sigterm timeout %v s, send signal 9 to container", timeout)
+
 		// timeout, use SIGKILL to retry.
 		if err := pack.task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -503,41 +492,17 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 					return nil, errors.Wrap(err, "failed to force destroy container")
 				}
 			}
-			goto clean
+			return nil, err
 		}
 		msg = waitExit()
 	}
 
-	// ignore the error is stop time out
-	// TODO: how to design the stop error is time out?
+	// if killing task fails, delete task is meaningless, just return error here.
 	if err := msg.RawError(); err != nil {
-		if !errtypes.IsTimeout(err) {
-			return nil, err
-		}
-		if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
-			log.With(ctx).Warnf("failed to force destroy container when kill error: %s", err)
-		}
-		log.With(ctx).Warnf("timeout to kill task, err(%v)", err)
+		return nil, err
 	}
 
-clean:
-	// for normal destroy process, task.Delete() and container.Delete()
-	// is done in ctrd/watch.go, after task exit. clean is task effect only
-	// when unexcepted error happened in task exit process.
-	if _, err := pack.task.Delete(ctx); err != nil {
-		if !errdefs.IsNotFound(err) {
-			log.With(ctx).Errorf("failed to delete task %s again: %v", pack.id, err)
-		}
-	}
-	if err := pack.container.Delete(ctx); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return msg, errors.Wrap(err, "failed to delete container")
-		}
-	}
-
-	log.With(ctx).Infof("success to destroy container")
-
-	return msg, c.watch.remove(ctx, id)
+	return msg, nil
 }
 
 func (c *Client) forceDestroyContainer(ctx context.Context, id string) error {

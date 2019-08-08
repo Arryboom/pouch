@@ -203,7 +203,7 @@ func (suite *PouchInspectSuite) TestContainerInspectState(c *check.C) {
 	output = command.PouchRun("inspect", "-f", "{{.State.ExitCode}}", name).Stdout()
 	c.Assert(strings.TrimSpace(output), check.Not(check.Equals), "0")
 	output = command.PouchRun("inspect", "-f", "{{.State.Status}}", name).Stdout()
-	c.Assert(strings.TrimSpace(output), check.Equals, "stopped")
+	c.Assert(strings.TrimSpace(output), check.Equals, "exited")
 }
 
 func (suite *PouchInspectSuite) TestContainerInspectPorts(c *check.C) {

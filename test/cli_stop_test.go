@@ -48,7 +48,7 @@ func (suite *PouchStopSuite) TestStopWorks(c *check.C) {
 
 	status, err := inspectFilter(name, ".State.Status")
 	c.Assert(err, check.IsNil)
-	c.Assert(status, check.Equals, "stopped")
+	c.Assert(status, check.Equals, "exited")
 
 	// test stop container with timeout(*seconds)
 	command.PouchRun("start", name).Assert(c, icmd.Success)
@@ -56,7 +56,7 @@ func (suite *PouchStopSuite) TestStopWorks(c *check.C) {
 
 	status, err = inspectFilter(name, ".State.Status")
 	c.Assert(err, check.IsNil)
-	c.Assert(status, check.Equals, "stopped")
+	c.Assert(status, check.Equals, "exited")
 
 	// test stop a paused container
 	command.PouchRun("start", name).Assert(c, icmd.Success)
@@ -65,7 +65,7 @@ func (suite *PouchStopSuite) TestStopWorks(c *check.C) {
 
 	status, err = inspectFilter(name, ".State.Status")
 	c.Assert(err, check.IsNil)
-	c.Assert(status, check.Equals, "stopped")
+	c.Assert(status, check.Equals, "exited")
 }
 
 // TestStopInWrongWay tries to run create in wrong way.
@@ -98,11 +98,11 @@ func (suite *PouchStopSuite) TestStopMultiContainers(c *check.C) {
 	// test if the container is already stopped
 	status, err := inspectFilter(name1, ".State.Status")
 	c.Assert(err, check.IsNil)
-	c.Assert(status, check.Equals, "stopped")
+	c.Assert(status, check.Equals, "exited")
 
 	status, err = inspectFilter(name2, ".State.Status")
 	c.Assert(err, check.IsNil)
-	c.Assert(status, check.Equals, "stopped")
+	c.Assert(status, check.Equals, "exited")
 }
 
 // TestStopPidValue ensure stopped container's pid is 0

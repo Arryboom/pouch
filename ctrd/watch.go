@@ -114,39 +114,25 @@ func (w *watch) add(ctx context.Context, pack *containerPack) {
 			exitTime: status.ExitTime(),
 		}
 
-		// NOTE: cleanup action should be taken only once!
-		var cleanupOnce sync.Once
-		cleanupFunc := func() error {
-			cleanupOnce.Do(func() {
-				if _, err := pack.task.Delete(context.Background()); err != nil {
-					log.With(ctx).Errorf("failed to delete task, container id: %s: %v", pack.id, err)
-				}
-
-				if err := pack.container.Delete(context.Background()); err != nil {
-					log.With(ctx).Errorf("failed to delete container, container id: %s: %v", pack.id, err)
-				}
-			})
-			return nil
+		if _, err := pack.task.Delete(context.Background()); err != nil {
+			log.With(ctx).Errorf("failed to delete task, container id: %s: %v", pack.id, err)
 		}
 
-		pack.l.RLock()
-		skipCleanup := pack.skipStopHooks
-		pack.l.RUnlock()
-		if !skipCleanup {
-			for _, hook := range w.hooks {
-				if err := hook(pack.id, msg, cleanupFunc); err != nil {
-					log.With(ctx).Errorf("failed to execute the exit hooks: %v", err)
-					break
-				}
-			}
-
-			// if stop container was triggered, skipStopHooks will be set to true, cleanup logic will be invoke by stop
-			// routine.
-			cleanupFunc()
+		if err := pack.container.Delete(context.Background()); err != nil {
+			log.With(ctx).Errorf("failed to delete container, container id: %s: %v", pack.id, err)
 		}
 
+		// notify destroyContainer to stop container.
 		pack.ch <- msg
 
+		for _, hook := range w.hooks {
+			if err := hook(pack.id, msg, nil); err != nil {
+				log.With(ctx).Errorf("failed to execute the exit hooks: %v", err)
+				break
+			}
+		}
+
+		w.remove(ctx, pack.id)
 	}(w, pack)
 
 	log.With(ctx).Infof("success to add container")
