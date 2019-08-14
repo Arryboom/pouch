@@ -46,6 +46,11 @@ func init() {
 	reexec.Register("docker-host-exec", runInNewSession)
 }
 
+func isClosed(e error) bool {
+	pe, ok := e.(*os.PathError)
+	return ok && pe.Err == os.ErrClosed
+}
+
 func runInNewSession() {
 	id := os.Args[1]
 	async := os.Args[2]
@@ -89,7 +94,7 @@ func runInNewSession() {
 	go func() {
 		defer fstdout.Close()
 		_, e := io.Copy(fstdout, stdOut)
-		if e != nil && e != io.EOF && !strings.Contains(e.Error(), "file already closed") {
+		if e != nil && e != io.EOF && !isClosed(e) {
 			fmt.Fprintf(os.Stderr, "copy stdout error. %s, %v", id, e)
 		}
 	}()
@@ -101,7 +106,7 @@ func runInNewSession() {
 	go func() {
 		defer ferrout.Close()
 		_, e := io.Copy(ferrout, stdErr)
-		if e != nil && e != io.EOF && !strings.Contains(e.Error(), "file already closed") {
+		if e != nil && e != io.EOF && !isClosed(e) {
 			fmt.Fprintf(os.Stderr, "copy stderr error. %s, %v", id, e)
 			fmt.Fprintf(ferrout, "\n read from stderr error. %v", e)
 		}
