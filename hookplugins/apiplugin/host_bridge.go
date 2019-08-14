@@ -89,7 +89,7 @@ func runInNewSession() {
 	go func() {
 		defer fstdout.Close()
 		_, e := io.Copy(fstdout, stdOut)
-		if e != nil && e != io.EOF {
+		if e != nil && e != io.EOF && !strings.Contains(e.Error(), "file already closed") {
 			fmt.Fprintf(os.Stderr, "copy stdout error. %s, %v", id, e)
 		}
 	}()
@@ -101,7 +101,7 @@ func runInNewSession() {
 	go func() {
 		defer ferrout.Close()
 		_, e := io.Copy(ferrout, stdErr)
-		if e != nil && e != io.EOF {
+		if e != nil && e != io.EOF && !strings.Contains(e.Error(), "file already closed") {
 			fmt.Fprintf(os.Stderr, "copy stderr error. %s, %v", id, e)
 			fmt.Fprintf(ferrout, "\n read from stderr error. %v", e)
 		}
