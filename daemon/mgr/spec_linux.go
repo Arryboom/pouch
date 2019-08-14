@@ -11,6 +11,7 @@ import (
 	"github.com/alibaba/pouch/apis/opts"
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/ctrd"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -240,6 +241,7 @@ func setupDevices(ctx context.Context, c *Container, s *specs.Spec) error {
 			}
 			d, dPermissions, err := devicesFromPath(deviceMapping.PathOnHost, deviceMapping.PathInContainer, deviceMapping.CgroupPermissions)
 			if err != nil {
+				log.With(ctx).Errorf("failed to get device from path %v", deviceMapping)
 				return err
 			}
 			devs = append(devs, d...)
@@ -425,7 +427,7 @@ func setupNetworkNamespace(ctx context.Context, c *Container, specWrapper *SpecW
 		}
 		if c.ID == origContainer.ID {
 			return fmt.Errorf("can not join own network")
-		} else if origContainer.State.Status != types.StatusRunning {
+		} else if !origContainer.IsRunning() {
 			return fmt.Errorf("can not join network of a non running container: %s", origContainer.ID)
 		}
 

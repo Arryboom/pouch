@@ -707,7 +707,6 @@ func (mgr *ContainerManager) setMountFS(ctx context.Context, c *Container) {
 
 // Mount sets the container rootfs
 func (mgr *ContainerManager) Mount(ctx context.Context, c *Container) error {
-
 	mounts, err := mgr.Client.GetMounts(ctx, c.ID)
 	if err != nil {
 		return err

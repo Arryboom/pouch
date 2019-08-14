@@ -25,17 +25,11 @@ const (
 	// StatusRunning captures enum value "running"
 	StatusRunning Status = "running"
 
-	// StatusStopped captures enum value "stopped"
-	StatusStopped Status = "stopped"
-
 	// StatusPaused captures enum value "paused"
 	StatusPaused Status = "paused"
 
 	// StatusRestarting captures enum value "restarting"
 	StatusRestarting Status = "restarting"
-
-	// StatusRemoving captures enum value "removing"
-	StatusRemoving Status = "removing"
 
 	// StatusExited captures enum value "exited"
 	StatusExited Status = "exited"
@@ -49,7 +43,7 @@ var statusEnum []interface{}
 
 func init() {
 	var res []Status
-	if err := json.Unmarshal([]byte(`["created","running","stopped","paused","restarting","removing","exited","dead"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["created","running","paused","restarting","exited","dead"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {

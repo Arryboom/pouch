@@ -95,7 +95,7 @@ func StartContainerOk(c *check.C, cname string) {
 // StopContainerOk stops the container and asserts success..
 func StopContainerOk(c *check.C, cname string) {
 	q := url.Values{}
-	q.Add("t", "10")
+	q.Add("t", "1")
 	query := request.WithQuery(q)
 
 	resp, err := request.Post("/containers/"+cname+"/stop", query)

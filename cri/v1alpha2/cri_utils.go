@@ -425,7 +425,7 @@ func toCriSandboxState(status apitypes.Status) runtime.PodSandboxState {
 }
 
 func toCriSandbox(c *mgr.Container) (*runtime.PodSandbox, error) {
-	state := toCriSandboxState(c.State.Status)
+	state := toCriSandboxState(c.GetStatus())
 	metadata, err := parseSandboxName(c.Name)
 	if err != nil {
 		return nil, err
@@ -925,8 +925,7 @@ func toCriContainerState(state *apitypes.ContainerState) (criState runtime.Conta
 		criState = runtime.ContainerState_CONTAINER_CREATED
 	case apitypes.StatusRunning:
 		criState = runtime.ContainerState_CONTAINER_RUNNING
-	case apitypes.StatusExited,
-		apitypes.StatusStopped:
+	case apitypes.StatusExited:
 		criState = runtime.ContainerState_CONTAINER_EXITED
 	case apitypes.StatusPaused:
 		criState = runtime.ContainerState_CONTAINER_PAUSE

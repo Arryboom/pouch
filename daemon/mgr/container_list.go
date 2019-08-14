@@ -164,7 +164,7 @@ func (fc *filterContext) filter(c *Container) bool {
 		case nameFilter:
 			match = fc.matchFilter(nameFilter, c.Name)
 		case statusFilter:
-			match = fc.matchFilter(statusFilter, string(c.State.Status))
+			match = fc.matchFilter(statusFilter, string(c.GetStatus()))
 		default:
 			continue
 		}
@@ -204,9 +204,12 @@ func (mgr *ContainerManager) List(ctx context.Context, option *ContainerListOpti
 			continue
 		}
 
+		// lock container and deep copy container information.
+		c.Lock()
 		if fc.filter(c) {
-			cons = append(cons, c)
+			cons = append(cons, c.DeepCopy())
 		}
+		c.Unlock()
 	}
 
 	return cons, nil

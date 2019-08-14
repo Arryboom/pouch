@@ -26,12 +26,18 @@ const nanoSecondsPerSecond = 1e9
 
 // StreamStats gets the stats from containerd side and send back to caller as a stream.
 func (mgr *ContainerManager) StreamStats(ctx context.Context, name string, config *ContainerStatsConfig) error {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
+	// TODO(rudyfly): add lock?
+	c.Lock()
+	if !c.IsRunning() {
+		c.Unlock()
+		return errors.Errorf("container(%s) is not running", c.ID)
+	}
+	c.Unlock()
 
 	outStream := config.OutStream
 
@@ -104,7 +110,7 @@ func (mgr *ContainerManager) StreamStats(ctx context.Context, name string, confi
 
 // Stats gets the stat of a container.
 func (mgr *ContainerManager) Stats(ctx context.Context, name string) (*containerdtypes.Metric, *cgroups.Metrics, error) {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}

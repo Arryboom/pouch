@@ -28,6 +28,21 @@ func (m *SafeMap) Get(k string) *Value {
 	return &Value{v, ok}
 }
 
+// ExistAndPut checks key is exist and set it.
+func (m *SafeMap) ExistAndPut(k string, v interface{}) bool {
+	m.Lock()
+	defer m.Unlock()
+
+	_, ok := m.inner[k]
+	if ok {
+		return true
+	}
+
+	m.inner[k] = v
+
+	return false
+}
+
 // Values returns all key-values stored in map
 func (m *SafeMap) Values(filter ValueFilter) map[string]interface{} {
 	m.RLock()

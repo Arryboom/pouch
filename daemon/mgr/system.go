@@ -81,13 +81,13 @@ func (mgr *SystemManager) Info() (types.SystemInfo, error) {
 		if !ok {
 			return nil
 		}
-		status := c.State.Status
+		status := c.GetStatus()
 		switch status {
 		case types.StatusRunning:
 			atomic.AddInt64(&cRunning, 1)
 		case types.StatusPaused:
 			atomic.AddInt64(&cPaused, 1)
-		case types.StatusStopped:
+		case types.StatusExited:
 			atomic.AddInt64(&cStopped, 1)
 		}
 

@@ -21,12 +21,11 @@ func (mgr *ContainerManager) Commit(ctx context.Context, name string, options *t
 		options.Tag = "latest"
 	}
 
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find container(%s) to commit", name)
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
 	c.Lock()
 	defer c.Unlock()
 
@@ -35,11 +34,11 @@ func (mgr *ContainerManager) Commit(ctx context.Context, name string, options *t
 	}
 
 	if c.IsRunning() {
-		if err := mgr.doPause(ctx, c); err != nil {
+		if err := mgr.pause(ctx, c); err != nil {
 			return nil, errors.Wrapf(err, "failed to pause container(%s)", c.ID)
 		}
 		defer func() {
-			if err := mgr.doUnpause(ctx, c); err != nil {
+			if err := mgr.unpause(ctx, c); err != nil {
 				log.With(ctx).Warnf("failed to unpause container(%s): %v", c.ID, err)
 			}
 		}()

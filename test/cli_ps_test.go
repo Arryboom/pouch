@@ -65,7 +65,7 @@ func (suite *PouchPsSuite) TestPsWorks(c *check.C) {
 		res := command.PouchRun("ps", "-a").Assert(c, icmd.Success)
 		kv := psToKV(res.Combined())
 
-		c.Assert(kv[name].status[0], check.Equals, "Stopped")
+		c.Assert(kv[name].status[0], check.Equals, "Exited")
 	}
 
 }

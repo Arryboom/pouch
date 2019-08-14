@@ -5,6 +5,7 @@ import (
 
 	"github.com/alibaba/pouch/cri/stream"
 	criv1alpha2 "github.com/alibaba/pouch/cri/v1alpha2"
+	"github.com/alibaba/pouch/ctrd"
 	"github.com/alibaba/pouch/daemon/config"
 	"github.com/alibaba/pouch/daemon/mgr"
 	"github.com/alibaba/pouch/hookplugins"
@@ -20,21 +21,21 @@ type Server interface {
 
 // NewCriServer start cri service if pouchd is specified with --enable-cri.
 // if stream.Router is not nil, pouch server should register this router.
-func NewCriServer(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, Server, error) {
+func NewCriServer(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin, ctrdCli ctrd.APIClient) (stream.Router, Server, error) {
 	if !daemonconfig.IsCriEnabled {
 		return nil, nil, nil
 	}
 	switch daemonconfig.CriConfig.CriVersion {
 	case "v1alpha2":
-		return newCRIServiceV1alpha2(daemonconfig, containerMgr, imageMgr, volumeMgr, criPlugin)
+		return newCRIServiceV1alpha2(daemonconfig, containerMgr, imageMgr, volumeMgr, criPlugin, ctrdCli)
 	default:
 		return nil, nil, fmt.Errorf("invalid CRI version %s, expected to be v1alpha2", daemonconfig.CriConfig.CriVersion)
 	}
 }
 
 // create CRI service with CRI version: v1alpha2
-func newCRIServiceV1alpha2(daemonConfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, Server, error) {
-	criMgr, err := criv1alpha2.NewCriManager(daemonConfig, containerMgr, imageMgr, volumeMgr, criPlugin)
+func newCRIServiceV1alpha2(daemonConfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin, ctrdCli ctrd.APIClient) (stream.Router, Server, error) {
+	criMgr, err := criv1alpha2.NewCriManager(daemonConfig, containerMgr, imageMgr, volumeMgr, criPlugin, ctrdCli)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get CriManager with error: %v", err)
 	}

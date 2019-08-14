@@ -164,7 +164,7 @@ func (rc *RunCommand) runRun(args []string) error {
 		return nil
 	}
 
-	info, err := apiClient.ContainerGet(ctx, containerName)
+	info, err := apiClient.ContainerWait(ctx, containerName)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (rc *RunCommand) runRun(args []string) error {
 		}
 	}
 
-	code := info.State.ExitCode
+	code := info.StatusCode
 	if code != 0 {
 		return ExitError{Code: int(code)}
 	}

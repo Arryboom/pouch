@@ -36,7 +36,7 @@ type ContainerAPIClient interface {
 	// CreateContainer creates a containerd container and start process.
 	CreateContainer(ctx context.Context, container *Container, checkpointDir string) error
 	// DestroyContainer kill container and delete it.
-	DestroyContainer(ctx context.Context, id string, timeout int64) (*Message, error)
+	DestroyContainer(ctx context.Context, id string, timeout int64) error
 	// ProbeContainer probe the container's status, if timeout <= 0, will block to receive message.
 	ProbeContainer(ctx context.Context, id string, timeout time.Duration) *Message
 	// ContainerPIDs returns the all processes's ids inside the container.

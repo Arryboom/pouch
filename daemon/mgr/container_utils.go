@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	networktypes "github.com/alibaba/pouch/network/types"
 	"github.com/alibaba/pouch/pkg/collect"
 	"github.com/alibaba/pouch/pkg/errtypes"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/meta"
 	"github.com/alibaba/pouch/pkg/randomid"
 
@@ -71,19 +73,27 @@ func containerFromCache(cache *collect.SafeMap, key string) (*Container, error) 
 	return nil, errors.Wrapf(errtypes.ErrNotfound, "container %s", key)
 }
 
-func (mgr *ContainerManager) container(nameOrPrefix string) (*Container, error) {
+func (mgr *ContainerManager) container(ctx context.Context, nameOrPrefix string) (rctx context.Context, c *Container, err error) {
+	defer func() {
+		if err == nil {
+			// set container's id into context
+			rctx = log.AddFields(rctx, map[string]interface{}{"ContainerID": c.ID})
+		}
+	}()
 	res, err := containerFromCache(mgr.cache, nameOrPrefix)
 	if err == nil {
-		return res, nil
+		return ctx, res, nil
 	}
 
 	id, err := mgr.containerID(nameOrPrefix)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	// lookup again
-	return containerFromCache(mgr.cache, id)
+	c, err = containerFromCache(mgr.cache, id)
+
+	return ctx, c, err
 }
 
 // generateID generates an ID for newly created container. We must ensure that

@@ -47,18 +47,6 @@ func TestContainer_FormatStatus(t *testing.T) {
 			err:      nil,
 		},
 		{
-			name: "Stopped",
-			input: &Container{
-				State: &types.ContainerState{
-					Status:     types.StatusStopped,
-					FinishedAt: time.Now().Add(0 - utils.Minute).UTC().Format(utils.TimeLayout),
-					ExitCode:   1,
-				},
-			},
-			expected: "Stopped (1) 1 minute",
-			err:      nil,
-		},
-		{
 			name: "Running",
 			input: &Container{
 				State: &types.ContainerState{

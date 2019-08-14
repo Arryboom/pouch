@@ -119,12 +119,12 @@ func (s *StartCommand) runStart(args []string) error {
 			<-wait
 		}
 
-		info, err := apiClient.ContainerGet(ctx, container)
+		info, err := apiClient.ContainerWait(ctx, container)
 		if err != nil {
 			return err
 		}
 
-		code := info.State.ExitCode
+		code := info.StatusCode
 		if code != 0 {
 			return ExitError{Code: int(code)}
 		}

@@ -13,26 +13,35 @@ import (
 	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/utils"
 
-	pkgerrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 )
 
 var watchTimeout = 300 * time.Millisecond
 
 // Logs is used to return log created by the container.
 func (mgr *ContainerManager) Logs(ctx context.Context, name string, logOpt *types.ContainerLogsOptions) (<-chan *logger.LogMessage, bool, error) {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, false, err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
+	c.Lock()
+
+	log.With(ctx).Debug("container get logs")
+
+	if c.IsDead() {
+		c.Unlock()
+		return nil, false, errors.Errorf("container %s is dead", c.ID)
+	}
 
 	if !(logOpt.ShowStdout || logOpt.ShowStderr) {
-		return nil, false, pkgerrors.Wrap(errtypes.ErrInvalidParam, "you must choose at least one stream")
+		c.Unlock()
+		return nil, false, errors.Wrap(errtypes.ErrInvalidParam, "you must choose at least one stream")
 	}
 
 	if c.HostConfig.LogConfig.LogDriver != types.LogConfigLogDriverJSONFile {
-		return nil, false, pkgerrors.Wrapf(
+		c.Unlock()
+		return nil, false, errors.Wrapf(
 			errtypes.ErrInvalidParam,
 			"only support for the %v log driver", types.LogConfigLogDriverJSONFile,
 		)
@@ -40,6 +49,7 @@ func (mgr *ContainerManager) Logs(ctx context.Context, name string, logOpt *type
 
 	cfg, err := convContainerLogsOptionsToReadConfig(logOpt)
 	if err != nil {
+		c.Unlock()
 		return nil, false, err
 	}
 
@@ -48,22 +58,25 @@ func (mgr *ContainerManager) Logs(ctx context.Context, name string, logOpt *type
 		msgCh := make(chan *logger.LogMessage, 1)
 		close(msgCh)
 
+		c.Unlock()
+
 		return msgCh, c.Config.Tty, nil
 	}
 
 	fileName := filepath.Join(mgr.Store.Path(c.ID), "json.log")
-
 	jf, err := jsonfile.NewJSONLogFile(fileName, 0640, nil, nil)
-
 	if err != nil {
+		c.Unlock()
 		return nil, false, err
 	}
 
 	// NOTE: unset the follow if the container is not running
-	cfg.Follow = cfg.Follow && c.State.Running
+	cfg.Follow = cfg.Follow && c.IsRunning()
 
 	msgCh := make(chan *logger.LogMessage, 1)
 	watcher := jf.ReadLogMessages(cfg)
+
+	c.Unlock()
 
 	go func() {
 		defer jf.Close()
@@ -105,12 +118,12 @@ func (mgr *ContainerManager) Logs(ctx context.Context, name string, logOpt *type
 				// NOTE: if it is not OK, it maybe removed.
 				// This case will be convered by the followFile
 				// in daemon/logger/jsonfile package.
-				if c, ok := mgr.cache.Get(c.ID).Result(); ok {
-					if !c.(*Container).State.Running {
-						return
-					}
+				c.Lock()
+				if !c.IsRunning() {
+					c.Unlock()
+					return
 				}
-
+				c.Unlock()
 			}
 		}
 	}()

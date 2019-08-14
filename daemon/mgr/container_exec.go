@@ -8,7 +8,6 @@ import (
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/ctrd"
 	"github.com/alibaba/pouch/pkg/errtypes"
-	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/randomid"
 	"github.com/alibaba/pouch/pkg/streams"
 	"github.com/alibaba/pouch/pkg/user"
@@ -20,12 +19,16 @@ import (
 
 // CreateExec creates exec process's meta data.
 func (mgr *ContainerManager) CreateExec(ctx context.Context, name string, config *types.ExecCreateConfig) (string, error) {
-	c, err := mgr.container(name)
+	_, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return "", err
 	}
 
-	if !c.State.Running {
+	// TODO(rudyfly): need review.
+	c.Lock()
+	defer c.Unlock()
+
+	if !c.IsRunning() {
 		return "", fmt.Errorf("container %s is not running", c.ID)
 	}
 
@@ -81,13 +84,17 @@ func (mgr *ContainerManager) StartExec(ctx context.Context, execid string, cfg *
 	}()
 
 	execConfig.Lock()
-	c, err := mgr.container(execConfig.ContainerID)
+	ctx, c, err := mgr.container(ctx, execConfig.ContainerID)
 	if err != nil {
 		execConfig.Unlock()
 		return err
 	}
-
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
+	// TODO(rudyfly): add lock and check status ?
+	c.Lock()
+	if !c.IsRunning() {
+		c.Unlock()
+		return errors.Errorf("container(%s) is not running", c.ID)
+	}
 
 	// set exec process user, user decided by exec config
 	if execConfig.User == "" {
@@ -97,6 +104,7 @@ func (mgr *ContainerManager) StartExec(ctx context.Context, execid string, cfg *
 	uid, gid, additionalGids, err := user.Get(c.GetSpecificBasePath("", user.PasswdFile),
 		c.GetSpecificBasePath("", user.GroupFile), execConfig.User, c.HostConfig.GroupAdd)
 	if err != nil {
+		c.Unlock()
 		execConfig.Unlock()
 		return err
 	}
@@ -135,9 +143,12 @@ func (mgr *ContainerManager) StartExec(ctx context.Context, execid string, cfg *
 
 	// set exec process ulimit, ulimit not decided by exec config
 	if err := setupRlimits(ctx, c.HostConfig, &specs.Spec{Process: process}); err != nil {
+		c.Unlock()
 		execConfig.Unlock()
 		return err
 	}
+
+	c.Unlock()
 
 	// NOTE: the StartExec might use the hijack's connection as
 	// stdin in the AttachConfig. If we close it directly, the stdout/stderr

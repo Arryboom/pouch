@@ -111,6 +111,7 @@ type CriManager struct {
 	VolumeMgr    mgr.VolumeMgr
 	CniMgr       cni.CniMgr
 	CriPlugin    hookplugins.CriPlugin
+	CtrdCli      ctrd.APIClient
 
 	// StreamServer is the stream server of CRI serves container streaming request.
 	StreamServer StreamServer
@@ -135,7 +136,7 @@ type CriManager struct {
 }
 
 // NewCriManager creates a brand new cri manager.
-func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (CriMgr, error) {
+func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin, ctrdCli ctrd.APIClient) (CriMgr, error) {
 	streamCfg, err := toStreamConfig(config)
 	if err != nil {
 		return nil, err
@@ -145,23 +146,24 @@ func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.Im
 		return nil, fmt.Errorf("failed to create stream server for cri manager: %v", err)
 	}
 
-	c := &CriManager{
+	cri := &CriManager{
 		ContainerMgr:   ctrMgr,
 		ImageMgr:       imgMgr,
 		VolumeMgr:      volumeMgr,
 		CriPlugin:      criPlugin,
+		CtrdCli:        ctrdCli,
 		StreamServer:   streamServer,
 		SandboxBaseDir: path.Join(config.HomeDir, "sandboxes"),
 		SandboxImage:   config.CriConfig.SandboxImage,
 		SnapshotStore:  mgr.NewSnapshotStore(),
 		DaemonConfig:   config,
 	}
-	c.CniMgr, err = cni.NewCniManager(&config.CriConfig)
+	cri.CniMgr, err = cni.NewCniManager(&config.CriConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cni manager: %v", err)
 	}
 
-	c.SandboxStore, err = meta.NewStore(meta.Config{
+	cri.SandboxStore, err = meta.NewStore(meta.Config{
 		Driver:  "local",
 		BaseDir: path.Join(config.HomeDir, "sandboxes-meta"),
 		Buckets: []meta.Bucket{
@@ -175,16 +177,17 @@ func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.Im
 		return nil, fmt.Errorf("failed to create sandbox meta store: %v", err)
 	}
 
-	c.imageFSPath = imageFSPath(path.Join(config.HomeDir, "containerd/root"), ctrd.CurrentSnapshotterName(context.TODO()))
-	log.With(nil).Infof("Get image filesystem path %q", c.imageFSPath)
+	cri.imageFSPath = imageFSPath(path.Join(config.HomeDir, "containerd/root"), ctrd.CurrentSnapshotterName(context.TODO()))
+	log.With(nil).Infof("Get image filesystem path %q", cri.imageFSPath)
 
 	if !config.CriConfig.DisableCriStatsCollect {
 		period := config.CriConfig.CriStatsCollectPeriod
 		if period <= 0 {
 			return nil, fmt.Errorf("cri stats collect period should > 0")
 		}
-		snapshotsSyncer := ctrMgr.NewSnapshotsSyncer(
-			c.SnapshotStore,
+		snapshotsSyncer := mgr.NewSnapshotsSyncer(
+			cri.SnapshotStore,
+			cri.CtrdCli,
 			time.Duration(period)*time.Second,
 		)
 		snapshotsSyncer.Start()
@@ -192,7 +195,7 @@ func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.Im
 		log.With(nil).Infof("disable cri to collect stats from containerd periodically")
 	}
 
-	return c, nil
+	return cri, nil
 }
 
 // StreamServerStart starts the stream server of CRI.
@@ -658,7 +661,7 @@ func (c *CriManager) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 
 	// Translate container to sandbox state.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
-	if sandbox.State.Status == apitypes.StatusRunning {
+	if sandbox.IsRunning() {
 		state = runtime.PodSandboxState_SANDBOX_READY
 	}
 
@@ -1178,7 +1181,7 @@ func (c *CriManager) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	}
 
 	// cannot update container resource when it is in removing state
-	if container.IsRemoving() {
+	if container.IsDead() {
 		return nil, fmt.Errorf("cannot to update resource for container %q when it is in removing state", containerID)
 	}
 

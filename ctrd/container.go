@@ -415,38 +415,35 @@ func (c *Client) recoverContainer(ctx context.Context, id string, io *containeri
 }
 
 // DestroyContainer kill container and delete it.
-func (c *Client) DestroyContainer(ctx context.Context, id string, timeout int64) (*Message, error) {
-	msg, err := c.destroyContainer(ctx, id, timeout)
-	if err != nil {
-		return msg, convertCtrdErr(err)
-	}
-	return msg, nil
+func (c *Client) DestroyContainer(ctx context.Context, id string, timeout int64) error {
+	return convertCtrdErr(c.destroyContainer(ctx, id, timeout))
 }
 
 // destroyContainer kill container and delete it.
-func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64) (*Message, error) {
+func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64) error {
+	var err error
 	// TODO(ziren): if we just want to stop a container,
 	// we may need lease to lock the snapshot of container,
 	// in case, it be deleted by gc.
 	wrapperCli, err := c.Get(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get a containerd grpc client: %v", err)
+		return fmt.Errorf("failed to get a containerd grpc client: %v", err)
 	}
 
 	ctx = leases.WithLease(ctx, wrapperCli.lease.ID)
 
 	if !c.lock.TrylockWithRetry(ctx, id) {
-		return nil, errtypes.ErrLockfailed
+		return errtypes.ErrLockfailed
 	}
 	defer c.lock.Unlock(id)
 
 	pack, err := c.watch.get(id)
 	if err != nil {
-		if err := c.forceDestroyContainer(ctx, id); err != nil {
-			return nil, err
+		if err = c.forceDestroyContainer(ctx, id); err != nil {
+			return err
 		}
 
-		return nil, nil
+		return nil
 	}
 
 	waitExit := func() *Message {
@@ -458,51 +455,54 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 	// TODO: set task request timeout by context timeout
 	nCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
-	if err := pack.task.Kill(nCtx, syscall.SIGTERM, containerd.WithKillAll); err != nil {
-		if !errdefs.IsNotFound(err) {
-			// retry with kill 9
-			nCtxForce, cancelForce := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
-			defer cancelForce()
-			if err := pack.task.Kill(nCtxForce, syscall.SIGKILL, containerd.WithKillAll); err != nil {
-				if !errdefs.IsNotFound(err) {
-					// force to kill containerd-shim and all container's threads
-					if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
-						return nil, errors.Wrap(err, "failed to force destroy container")
-					}
-				}
-				goto clean
-			}
-		} else {
-			goto clean
+	if err = pack.task.Kill(nCtx, syscall.SIGTERM, containerd.WithKillAll); err != nil {
+		if errdefs.IsNotFound(err) {
+			return err
 		}
-		return nil, err
+
+		// retry with kill 9
+		nCtxForce, cancelForce := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancelForce()
+		if err = pack.task.Kill(nCtxForce, syscall.SIGKILL, containerd.WithKillAll); err != nil {
+			if errdefs.IsNotFound(err) {
+				return err
+			}
+			// force to kill containerd-shim and all container's threads
+			if err = c.forceDestroyContainer(ctx, pack.id); err != nil {
+				return errors.Wrap(err, "failed to force destroy container")
+			}
+		}
+
+		return err
 	}
 
 	// wait for the task to exit.
 	msg = waitExit()
 
-	if err := msg.RawError(); err != nil && errtypes.IsTimeout(err) {
-		log.With(ctx).WithField("container", id).Warningf("send sigterm timeout %v s, send signal 9 to container", timeout)
+	if err = msg.RawError(); err != nil && errtypes.IsTimeout(err) {
+		log.With(ctx).Warnf("send sigterm timeout %d s, send signal 9 to container", timeout)
 
 		// timeout, use SIGKILL to retry.
-		if err := pack.task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
-			if !errdefs.IsNotFound(err) {
-				// force to kill containerd-shim and all container's threads
-				if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
-					return nil, errors.Wrap(err, "failed to force destroy container")
-				}
+		if err = pack.task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
+			if errdefs.IsNotFound(err) {
+				return err
 			}
-			return nil, err
+			// force to kill containerd-shim and all container's threads
+			if err = c.forceDestroyContainer(ctx, pack.id); err != nil {
+				return errors.Wrap(err, "failed to force destroy container")
+			}
+
+			return err
 		}
 		msg = waitExit()
 	}
 
 	// if killing task fails, delete task is meaningless, just return error here.
-	if err := msg.RawError(); err != nil {
-		return nil, err
+	if err = msg.RawError(); err != nil {
+		return err
 	}
 
-	return msg, nil
+	return nil
 }
 
 func (c *Client) forceDestroyContainer(ctx context.Context, id string) error {

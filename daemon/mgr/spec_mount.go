@@ -119,7 +119,8 @@ func mergeContainerMount(mounts []specs.Mount, c *Container, s *specs.Spec) ([]s
 		})
 	}
 
-	// if disable hostfiles, we will not mount the hosts files into container.
+	// if disable network files, we will not mount the hosts files into container that set into container's config
+	// c.HostnamePath , c.HostsPath and c.ResolvConfPath.
 	if !c.Config.DisableNetworkFiles {
 		mounts = append(mounts, generateNetworkMounts(c)...)
 	}

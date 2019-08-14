@@ -23,17 +23,15 @@ import (
 
 // StatPath stats the dir info at the specified path in the container.
 func (mgr *ContainerManager) StatPath(ctx context.Context, name, path string) (stat *types.ContainerPathStat, err error) {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
-
 	c.Lock()
 	defer c.Unlock()
 
-	if c.State.Dead {
+	if c.IsDead() {
 		return nil, pkgerrors.Errorf("container(%s) has been deleted", c.ID)
 	}
 
@@ -76,12 +74,10 @@ func (mgr *ContainerManager) StatPath(ctx context.Context, name, path string) (s
 
 // ArchivePath return an archive and dir info at the specified path in the container.
 func (mgr *ContainerManager) ArchivePath(ctx context.Context, name, path string) (content io.ReadCloser, stat *types.ContainerPathStat, err0 error) {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
 
 	c.Lock()
 	defer func() {
@@ -90,7 +86,7 @@ func (mgr *ContainerManager) ArchivePath(ctx context.Context, name, path string)
 		}
 	}()
 
-	if c.State.Dead {
+	if c.IsDead() {
 		return nil, nil, pkgerrors.Errorf("container(%s) has been deleted", c.ID)
 	}
 
@@ -166,17 +162,15 @@ func (mgr *ContainerManager) ArchivePath(ctx context.Context, name, path string)
 
 // ExtractToDir extracts the given archive at the specified path in the container.
 func (mgr *ContainerManager) ExtractToDir(ctx context.Context, name, path string, copyUIDGID, noOverwriteDirNonDir bool, content io.Reader) error {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
-
 	c.Lock()
 	defer c.Unlock()
 
-	if c.State.Dead {
+	if c.IsDead() {
 		return pkgerrors.Errorf("container(%s) has been deleted", c.ID)
 	}
 

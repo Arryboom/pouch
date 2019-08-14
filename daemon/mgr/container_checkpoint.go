@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/alibaba/pouch/apis/types"
-	"github.com/alibaba/pouch/pkg/log"
 )
 
 var (
@@ -55,15 +54,17 @@ func (mgr *ContainerManager) getCheckpointDir(container, prefixDir, checkpointID
 
 // CreateCheckpoint creates a checkpoint from a running container
 func (mgr *ContainerManager) CreateCheckpoint(ctx context.Context, name string, options *types.CheckpointCreateOptions) (err0 error) {
-	c, err := mgr.container(name)
+	ctx, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
+	// TODO(rudyfly): need review.
+	c.Lock()
+	defer c.Unlock()
 
 	if !c.IsRunningOrPaused() {
-		return fmt.Errorf("can not checkpoint from a %s container", c.State.Status)
+		return fmt.Errorf("can not checkpoint from a %s container", c.GetStatus())
 	}
 
 	if c.Config.Tty {
@@ -89,10 +90,12 @@ func (mgr *ContainerManager) CreateCheckpoint(ctx context.Context, name string, 
 
 // ListCheckpoint lists checkpoints from a container
 func (mgr *ContainerManager) ListCheckpoint(ctx context.Context, name string, options *types.CheckpointListOptions) ([]string, error) {
-	c, err := mgr.container(name)
+	_, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO(rudyfly): I think don't to add lock for container.
 
 	dir, err := mgr.getCheckpointDir(c.ID, options.CheckpointDir, "", false)
 	if err != nil {
@@ -120,10 +123,12 @@ func (mgr *ContainerManager) ListCheckpoint(ctx context.Context, name string, op
 
 // DeleteCheckpoint deletes a checkpoint from a container
 func (mgr *ContainerManager) DeleteCheckpoint(ctx context.Context, name string, options *types.CheckpointDeleteOptions) error {
-	c, err := mgr.container(name)
+	_, c, err := mgr.container(ctx, name)
 	if err != nil {
 		return err
 	}
+
+	// TODO(rudyfly): I think don't to add lock for container.
 
 	dir, err := mgr.getCheckpointDir(c.ID, options.CheckpointDir, options.CheckpointID, false)
 	if err != nil {

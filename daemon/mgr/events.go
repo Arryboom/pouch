@@ -102,15 +102,17 @@ func copyAttributes(attributes, labels map[string]string) {
 
 // publishContainerdEvent sends containerd events to pouchd event service.
 func (mgr *ContainerManager) publishContainerdEvent(ctx context.Context, id, action string, attributes map[string]string) error {
-	c, err := mgr.container(id)
+	ctx, c, err := mgr.container(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
-
 	c.Lock()
 	defer c.Unlock()
+
+	if c.IsDead() {
+		return nil
+	}
 
 	mgr.LogContainerEventWithAttributes(ctx, c, action, attributes)
 
@@ -119,15 +121,15 @@ func (mgr *ContainerManager) publishContainerdEvent(ctx context.Context, id, act
 
 // updateContainerState update container's state according to the containerd events.
 func (mgr *ContainerManager) updateContainerState(ctx context.Context, id, action string, attributes map[string]string) error {
-	c, err := mgr.container(id)
+	ctx, c, err := mgr.container(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	ctx = log.AddFields(ctx, map[string]interface{}{"ContainerID": c.ID})
-
 	c.Lock()
 	defer c.Unlock()
+
+	log.With(ctx).Infof("update container status by action(%s)", action)
 
 	// NOTE: updateContainerState is async-op and it will be executed with
 	// ContainerMgmt.Remove at the same time. mgr.container will use

@@ -244,7 +244,7 @@ func (d *Daemon) Run() error {
 	// set image proxy
 	ctrd.SetImageProxy(d.config.ImageProxy)
 
-	criStreamRouter, criServer, err := cri.NewCriServer(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin)
+	criStreamRouter, criServer, err := cri.NewCriServer(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin, d.ctrdClient)
 	if err != nil {
 		return err
 	}

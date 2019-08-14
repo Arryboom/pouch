@@ -19,6 +19,7 @@ import (
 	"github.com/alibaba/pouch/pkg/utils"
 
 	"github.com/containerd/containerd/mount"
+	"github.com/mohae/deepcopy"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -292,6 +293,21 @@ type Container struct {
 
 	// ShmPath
 	ShmPath string
+
+	// container exit report channel
+	ExitCh chan error `json:"-"`
+
+	DisableRestartPolicy bool
+}
+
+// DeepCopy copies container obj deeply.
+func (c *Container) DeepCopy() *Container {
+	dst, ok := deepcopy.Copy(c).(*Container)
+	if !ok {
+		log.With(nil).Errorf("failed to deep copy container")
+		return c
+	}
+	return dst
 }
 
 // Key returns container's id.
@@ -418,7 +434,7 @@ func (c *Container) FormatStatus() (string, error) {
 			status += "(paused)"
 		}
 
-	case types.StatusStopped, types.StatusExited:
+	case types.StatusExited:
 		finish, err := time.Parse(utils.TimeLayout, c.State.FinishedAt)
 		if err != nil {
 			return "", err
@@ -429,11 +445,7 @@ func (c *Container) FormatStatus() (string, error) {
 			return "", err
 		}
 
-		//FIXME: if stop status is needed ?
 		exitCode := c.State.ExitCode
-		if c.State.Status == types.StatusStopped {
-			status = fmt.Sprintf("Stopped (%d) %s", exitCode, finishAt)
-		}
 		if c.State.Status == types.StatusExited {
 			status = fmt.Sprintf("Exited (%d) %s", exitCode, finishAt)
 		}

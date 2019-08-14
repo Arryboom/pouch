@@ -3983,7 +3983,7 @@ definitions:
   Status:
     description: The status of the container. For example, "running" or "exited".
     type: "string"
-    enum: ["created", "running", "stopped", "paused", "restarting", "removing", "exited", "dead"]
+    enum: ["created", "running", "paused", "restarting", "exited", "dead"]
 
   SnapshotterData:
     description: "Information about a container's snapshotter."
