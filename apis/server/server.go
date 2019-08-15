@@ -116,6 +116,7 @@ func (s *Server) Stop() error {
 		for {
 			if atomic.LoadInt32(&s.FlyingReq) == 0 {
 				close(drain)
+				return
 			}
 			time.Sleep(time.Microsecond * 50)
 		}
