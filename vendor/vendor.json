@@ -533,12 +533,13 @@
 			"versionExact": "v1.2.5"
 		},
 		{
-			"checksumSHA1": "s6MY4EfD3/axPrmnqmCjCJYk2Kk=",
+			"checksumSHA1": "ue4+aR1OI4oYH9Mg4cD7Z6TOrZQ=",
+			"origin": "gitlab.alibaba-inc.com/pouch/containerd/remotes/docker",
 			"path": "github.com/containerd/containerd/remotes/docker",
-			"revision": "bb71b10fd8f58240ca47fbb579b9d1028eea7c84",
-			"revisionTime": "2019-03-13T05:41:42Z",
-			"version": "v1.2.5",
-			"versionExact": "v1.2.5"
+			"revision": "5610fef2b24cd2b9ca01c5f7b50c9cc089086a1a",
+			"revisionTime": "2019-08-15T06:29:47Z",
+			"version": "v1.2_develop",
+			"versionExact": "v1.2_develop"
 		},
 		{
 			"checksumSHA1": "8kIMXlnrrbIzYeqnZ1V+1q8l454=",

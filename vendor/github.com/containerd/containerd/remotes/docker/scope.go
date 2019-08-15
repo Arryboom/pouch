@@ -18,6 +18,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -71,6 +72,91 @@ func getTokenScopes(ctx context.Context, params map[string]string) []string {
 		scopes = append(scopes, scope)
 	}
 Sort:
+	scopes = deduplicateScopes(scopes)
 	sort.Strings(scopes)
 	return scopes
+}
+
+// deduplicateScopes deduplicates scopes.
+//
+// for example,
+//
+//    "repository:foo/bar:pull,push"
+//    "repository:foo/bar:push,pull"
+//    "repository:foo/bar:push"
+//    "repository:foo/bar:pull"
+//
+// the scopes will merge into one "repository:foo/bar:pull,push"
+//
+// NOTE:
+// resource scope is defined in https://docs.docker.com/registry/spec/auth/scope/
+//
+// resourcescope := resourcetype ":" resourcename ":" action [ ',' action ]*
+// action        := /[a-z]*/
+//
+// for now, there are several duplicate actions with same
+// [resourcescope:resourcename] scopes. consider [resourecetype:resourcename]
+// as resource type and use stringset to store actions to reduce duplicate
+// actions.
+func deduplicateScopes(scopes []string) []string {
+	scopeSet := newAccessScopeSet()
+	for _, scope := range scopes {
+		// NOTE: if the scope is not invalid, will return origin
+		// scopes and let auth server return error
+		idx := strings.LastIndex(scope, ":")
+		if idx == -1 {
+			return scopes
+		}
+
+		resource, actions := scope[:idx], scope[idx+1:]
+
+		actionSet, ok := scopeSet[resource]
+		if !ok {
+			actionSet = newStringSet()
+			scopeSet[resource] = actionSet
+		}
+		actionSet.add(strings.Split(actions, ",")...)
+	}
+	return scopeSet.scopes()
+}
+
+type accessScopeSet map[string]stringSet
+
+func newAccessScopeSet() accessScopeSet {
+	return make(accessScopeSet)
+}
+
+func (as accessScopeSet) scopes() []string {
+	res := make([]string, 0, len(as))
+	for resource, actionSet := range as {
+		actions := actionSet.keys()
+		sort.Strings(actions)
+
+		res = append(res, fmt.Sprintf("%s:%s", resource, strings.Join(actions, ",")))
+	}
+	return res
+}
+
+type stringSet map[string]struct{}
+
+func newStringSet(keys ...string) stringSet {
+	set := make(stringSet, len(keys))
+	for _, k := range keys {
+		set[k] = struct{}{}
+	}
+	return set
+}
+
+func (ss stringSet) add(keys ...string) {
+	for _, k := range keys {
+		ss[k] = struct{}{}
+	}
+}
+
+func (ss stringSet) keys() []string {
+	res := make([]string, 0, len(ss))
+	for k := range ss {
+		res = append(res, k)
+	}
+	return res
 }
