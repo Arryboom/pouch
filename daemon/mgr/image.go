@@ -18,6 +18,7 @@ import (
 	"github.com/alibaba/pouch/hookplugins"
 	"github.com/alibaba/pouch/pkg/errtypes"
 	"github.com/alibaba/pouch/pkg/jsonstream"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/reference"
 	"github.com/alibaba/pouch/pkg/utils"
 	"github.com/containerd/containerd"
@@ -28,7 +29,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	pkgerrors "github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // The daemon will load all the images from containerd into memory. At
@@ -217,7 +217,7 @@ func (mgr *ImageManager) PullImage(ctx context.Context, ref string, authConfig *
 	if err != nil {
 		return err
 	}
-	logrus.Infof("pulling image name %v reference %v", namedRef.String(), availableRef)
+	log.With(nil).Infof("pulling image name %v reference %v", namedRef.String(), availableRef)
 
 	img, err := mgr.client.FetchImage(pctx, resolver, availableRef, authConfig, stream)
 	if err != nil {
@@ -243,7 +243,7 @@ func (mgr *ImageManager) PullImage(ctx context.Context, ref string, authConfig *
 	// call plugin before pull image
 	if mgr.imagePlugin != nil {
 		if err = mgr.imagePlugin.PostPull(ctx, ctrd.CurrentSnapshotterName(ctx), img); err != nil {
-			logrus.Errorf("failed to execute post pull plugin: %s", err)
+			log.With(nil).Errorf("failed to execute post pull plugin: %s", err)
 			return err
 		}
 	}
@@ -347,7 +347,7 @@ func (mgr *ImageManager) ListImages(ctx context.Context, filter filters.Args) ([
 
 		imgInfo, err := mgr.containerdImageToImageInfo(ctx, img.ID)
 		if err != nil {
-			logrus.Warnf("failed to convert containerd image(%v) to ImageInfo during list images: %v", img.ID, err)
+			log.With(nil).Warnf("failed to convert containerd image(%v) to ImageInfo during list images: %v", img.ID, err)
 			continue
 		}
 
@@ -604,7 +604,7 @@ func (mgr *ImageManager) CheckReference(ctx context.Context, idOrRef string) (ac
 		refs := mgr.localStore.GetPrimaryReferences(actualID)
 		if len(refs) == 0 {
 			err = errtypes.ErrNotfound
-			logrus.Errorf("one Image ID must have the primary references, but got nothing")
+			log.With(nil).Errorf("one Image ID must have the primary references, but got nothing")
 			return
 		}
 
@@ -646,7 +646,7 @@ func (mgr *ImageManager) updateLocalStore() error {
 
 	for _, img := range imgs {
 		if err := mgr.StoreImageReference(ctx, img); err != nil {
-			logrus.Warnf("failed to load the image reference into local store: %v", err)
+			log.With(nil).Warnf("failed to load the image reference into local store: %v", err)
 		}
 	}
 	return nil

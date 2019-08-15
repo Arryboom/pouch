@@ -1,6 +1,7 @@
 package apiplugin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/alibaba/pouch/apis/server/types"
@@ -13,7 +14,7 @@ func init() {
 	hookplugins.RegisterAPIPlugin(&apiPlugin{})
 }
 
-func (a *apiPlugin) UpdateHandler(handlers []*types.HandlerSpec) []*types.HandlerSpec {
+func (a *apiPlugin) UpdateHandler(ctx context.Context, handlers []*types.HandlerSpec) []*types.HandlerSpec {
 	i := 0
 	for i < len(handlers) {
 		if removed := updateHandlerSpec(handlers[i]); removed {

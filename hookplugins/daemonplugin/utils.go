@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/alibaba/pouch/apis/types"
-
-	"github.com/sirupsen/logrus"
+	"github.com/alibaba/pouch/pkg/log"
 )
 
 var (
@@ -56,7 +55,7 @@ func getOneContainers(idOrName string) (c types.ContainerJSON, err error) {
 
 func setupEnv() {
 	if b, err := ioutil.ReadFile("/etc/sysconfig/pouch"); err != nil {
-		logrus.Infof("read config file error %v", err)
+		log.With(nil).Infof("read config file error %v", err)
 	} else {
 		for _, line := range bytes.Split(b, []byte{'\n'}) {
 			line = bytes.TrimSpace(line)

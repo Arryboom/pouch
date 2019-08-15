@@ -7,8 +7,9 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/alibaba/pouch/pkg/log"
+
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func alinetDial(proto, addr string) (conn net.Conn, err error) {
@@ -23,7 +24,7 @@ func NetworkExtendHandler(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return err
 	}
 
-	logrus.Infof("call network extend(%q)", request)
+	log.With(ctx).Infof("call network extend(%q)", request)
 
 	// post to alinet network plugin
 	client := &http.Client{
@@ -44,14 +45,14 @@ func NetworkExtendHandler(ctx context.Context, w http.ResponseWriter, r *http.Re
 	defer alinetResp.Body.Close()
 
 	if alinetResp.StatusCode != http.StatusOK {
-		logrus.Errorf("failed to call network extend, code(%d)", alinetResp.StatusCode)
+		log.With(ctx).Errorf("failed to call network extend, code(%d)", alinetResp.StatusCode)
 	}
 
 	if len(data) == 0 {
 		data = nil
-		logrus.Infof("end of call network extend, data is nil")
+		log.With(ctx).Infof("end of call network extend, data is nil")
 	} else {
-		logrus.Infof("end of call network extend, data(%q)", data)
+		log.With(ctx).Infof("end of call network extend, data(%q)", data)
 	}
 
 	w.Header().Set("Content-Type", alinetResp.Header.Get("Content-Type"))

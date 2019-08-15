@@ -14,12 +14,12 @@ import (
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/cri/stream/remotecommand"
 	"github.com/alibaba/pouch/ctrd"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/meta"
 	"github.com/alibaba/pouch/pkg/utils"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -490,7 +490,7 @@ func (c *Container) SetSnapshotterMeta(mounts []mount.Mount) {
 // GetSpecificBasePath accepts a given path, look for whether the path is exist
 // within container, if has, returns container base path like BaseFS, if not, return empty string
 func (c *Container) GetSpecificBasePath(prefixPath, path string) string {
-	logrus.Debugf("GetSpecificBasePath with prefixPath (%s) snapshotter data: (%v)", prefixPath, c.Snapshotter.Data)
+	log.With(nil).Debugf("GetSpecificBasePath with prefixPath (%s) snapshotter data: (%v)", prefixPath, c.Snapshotter.Data)
 
 	if prefixPath != "" {
 		absPath := filepath.Join(prefixPath, path)

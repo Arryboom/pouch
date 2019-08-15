@@ -2,6 +2,7 @@ package containerplugin
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -14,9 +15,9 @@ import (
 
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/daemon/mgr"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
 
@@ -74,7 +75,7 @@ func findBridgeIf() string {
 	return "p0"
 }
 
-func prepareNetwork(requestedIP, defaultRoute, mask, nic string, networkMode string, EndpointsConfig map[string]*types.EndpointSettings, rawEnv []string) (nwName string, err error) {
+func prepareNetwork(ctx context.Context, requestedIP, defaultRoute, mask, nic string, networkMode string, EndpointsConfig map[string]*types.EndpointSettings, rawEnv []string) (nwName string, err error) {
 	nwName = networkMode
 	nwIf := nic
 
@@ -96,7 +97,7 @@ func prepareNetwork(requestedIP, defaultRoute, mask, nic string, networkMode str
 	if getEnv(rawEnv, "OverlayNetwork") == optionOn {
 		nwName = nwName + ".overlay"
 	}
-	logrus.Infof("create container network params %s %s %s %s %s", requestedIP, defaultRoute, mask, nic, networkMode)
+	log.With(ctx).Infof("create container network params %s %s %s %s %s", requestedIP, defaultRoute, mask, nic, networkMode)
 
 	// 如果设置了网络四元组，同时网络是默认网络、bridge、自定义网络，则网络四元组才能生效
 	if requestedIP != "" && defaultRoute != "" && mask != "" && nic != "" &&
@@ -136,7 +137,7 @@ func prepareNetwork(requestedIP, defaultRoute, mask, nic string, networkMode str
 
 			createNwReq := types.NetworkCreateConfig{Name: nwName, NetworkCreate: nc}
 			addParamsForOverlay(nc.Options, rawEnv)
-			err := CreateNetwork(&createNwReq)
+			err := CreateNetwork(ctx, &createNwReq)
 			if err != nil {
 				return "", err
 			}
@@ -152,7 +153,7 @@ func prepareNetwork(requestedIP, defaultRoute, mask, nic string, networkMode str
 		EndpointsConfig[nwName].IPAMConfig.IPV4Address = requestedIP
 	}
 
-	logrus.Infof("create container network params from endpoint config %s %s %s %s %s", EndpointsConfig[nwName].IPAMConfig.IPV4Address, defaultRoute, mask, nic, nwName)
+	log.With(ctx).Infof("create container network params from endpoint config %s %s %s %s %s", EndpointsConfig[nwName].IPAMConfig.IPV4Address, defaultRoute, mask, nic, nwName)
 
 	return nwName, nil
 }
@@ -185,7 +186,7 @@ func checkNatBridge() bool {
 }
 
 // CreateNetwork create a network through pouch client
-func CreateNetwork(c *types.NetworkCreateConfig) error {
+func CreateNetwork(ctx context.Context, c *types.NetworkCreateConfig) error {
 	var rw bytes.Buffer
 	err := json.NewEncoder(&rw).Encode(c)
 	if err != nil {
@@ -201,7 +202,7 @@ func CreateNetwork(c *types.NetworkCreateConfig) error {
 	if err != nil {
 		return err
 	}
-	logrus.Infof("create network return %s", string(b))
+	log.With(ctx).Infof("create network return %s", string(b))
 	if strings.Contains(string(b), "failed") {
 		return fmt.Errorf(string(b))
 	}

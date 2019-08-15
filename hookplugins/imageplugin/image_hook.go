@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/alibaba/pouch/hookplugins"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/containerd/containerd"
-	"github.com/sirupsen/logrus"
 )
 
 type imagePlugin struct{}
@@ -28,9 +28,9 @@ func (i *imagePlugin) PostPull(ctx context.Context, snapshotter string, image co
 		// use a new context, or ctx will be canceled after image pull return
 		ctx = context.TODO()
 		if err := image.Unpack(ctx, "overlayfs"); err != nil {
-			logrus.Errorf("in post pull hook, failed to unpack image %s to overlayfs: %s", image.Name(), err)
+			log.With(ctx).Errorf("in post pull hook, failed to unpack image %s to overlayfs: %s", image.Name(), err)
 		} else {
-			logrus.Infof("in post pull hook, unpack image %s to overlayfs successful", image.Name())
+			log.With(ctx).Infof("in post pull hook, unpack image %s to overlayfs successful", image.Name())
 		}
 	}()
 

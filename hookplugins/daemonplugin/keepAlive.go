@@ -14,9 +14,8 @@ import (
 	"time"
 
 	"github.com/alibaba/pouch/apis/types"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/system"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -38,7 +37,7 @@ func cleanVmcommonDir() {
 	for range time.NewTicker(time.Hour * 23).C {
 		files, err := ioutil.ReadDir(homeDir)
 		if err != nil {
-			logrus.Errorf("read graph dir error. %s %v", homeDir, err)
+			log.With(nil).Errorf("read graph dir error. %s %v", homeDir, err)
 			continue
 		}
 		existDir := make(map[string]struct{})
@@ -61,13 +60,13 @@ func cleanVmcommonDir() {
 			}
 			ca, err = getAllContainers()
 			if err != nil {
-				logrus.Errorf("get all containers error %v", err)
+				log.With(nil).Errorf("get all containers error %v", err)
 				continue
 			}
 			for _, id := range ca {
 				c, err = getOneContainers(id)
 				if err != nil {
-					logrus.Errorf("get one container error. %s %v", id, err)
+					log.With(nil).Errorf("get one container error. %s %v", id, err)
 					break
 				}
 				for _, oneMount := range c.Mounts {
@@ -79,10 +78,10 @@ func cleanVmcommonDir() {
 			}
 			if afterWait {
 				for oneDir := range existDir {
-					logrus.Infof("remove dir %s because it is useless", oneDir)
+					log.With(nil).Infof("remove dir %s because it is useless", oneDir)
 					os.RemoveAll(oneDir)
 					if ba, err := ioutil.ReadDir(filepath.Dir(oneDir)); err == nil && len(ba) == 0 {
-						logrus.Infof("remove dir %s because it is useless", filepath.Dir(oneDir))
+						log.With(nil).Infof("remove dir %s because it is useless", filepath.Dir(oneDir))
 						os.RemoveAll(filepath.Dir(oneDir))
 					}
 				}
@@ -143,9 +142,9 @@ func activePluginsOnce() {
 				}
 			}
 			if e = activeOne.Start(); e != nil {
-				logrus.Errorf("start plugins error %s, %v", one, e)
+				log.With(nil).Errorf("start plugins error %s, %v", one, e)
 			} else {
-				logrus.Infof("start plugin success. %s", one)
+				log.With(nil).Infof("start plugin success. %s", one)
 				go func() {
 					activeOne.Wait()
 				}()

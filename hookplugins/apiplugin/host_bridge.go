@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/sirupsen/logrus"
 )
 
 var once sync.Once
@@ -129,17 +129,17 @@ func runInNewSession() {
 func writeJSON(w http.ResponseWriter, obj interface{}) {
 	b, e := json.Marshal(obj)
 	if e != nil {
-		logrus.Errorf("json marshal error. %v", e)
+		log.With(nil).Errorf("json marshal error. %v", e)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("json marshal error " + e.Error()))
 		return
 	}
-	logrus.Debugf("write json %s", string(b))
+	log.With(nil).Debugf("write json %s", string(b))
 	w.Write(b)
 }
 
 func writeEx(w http.ResponseWriter, obj requestResult, e error, extra string) {
-	logrus.Errorf(extra+" error %v", e)
+	log.With(nil).Errorf(extra+" error %v", e)
 	obj.Msg = e.Error()
 	obj.Success = false
 	w.WriteHeader(http.StatusInternalServerError)
@@ -147,7 +147,7 @@ func writeEx(w http.ResponseWriter, obj requestResult, e error, extra string) {
 }
 
 func writeExCallback(w http.ResponseWriter, obj callbackResult, e error, extra string) {
-	logrus.Errorf(extra+" error %v", e)
+	log.With(nil).Errorf(extra+" error %v", e)
 	obj.Msg = e.Error()
 	obj.Success = false
 	w.WriteHeader(http.StatusInternalServerError)
@@ -158,7 +158,7 @@ func writeExCallback(w http.ResponseWriter, obj callbackResult, e error, extra s
 func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) (err error) {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.Errorf("host exec result recover from %v", err)
+			log.With(nil).Errorf("host exec result recover from %v", err)
 		}
 	}()
 	result := requestResult{}
@@ -168,7 +168,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 	async := r.FormValue("async") == "true"
 
 	if e != nil {
-		logrus.Errorf("read host exec body error. %v", e)
+		log.With(nil).Errorf("read host exec body error. %v", e)
 		w.WriteHeader(http.StatusBadRequest)
 		result.Msg = "read body error " + e.Error()
 		writeJSON(w, result)
@@ -206,7 +206,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 	e = command.Start()
 
 	if e != nil {
-		logrus.Errorf("failed. %v", e)
+		log.With(nil).Errorf("failed. %v", e)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		result.Msg = "exec failed.  " + e.Error()
 		writeJSON(w, result)
@@ -219,7 +219,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 		var stdBuffer bytes.Buffer
 		n, e := io.Copy(&stdBuffer, stdOut)
 		if (e == nil || e == io.EOF) && n > 0 {
-			logrus.Infof("host exec sum process stdout %s, %s", id, string(stdBuffer.Bytes()))
+			log.With(nil).Infof("host exec sum process stdout %s, %s", id, string(stdBuffer.Bytes()))
 		}
 	}()
 	go func() {
@@ -242,7 +242,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 			<-finishChan
 			for ex := range errChan {
 				if ex != nil {
-					logrus.Errorf("%s command run error. %v", id, ex)
+					log.With(nil).Errorf("%s command run error. %v", id, ex)
 				}
 			}
 		}()
@@ -252,7 +252,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 	<-finishChan
 	for ex := range errChan {
 		if ex != nil {
-			logrus.Errorf("%s command run error. %v", id, ex)
+			log.With(nil).Errorf("%s command run error. %v", id, ex)
 			writeEx(w, result, ex, id+" exec")
 			return
 		}
@@ -288,7 +288,7 @@ func HostExecHandler(ctx context.Context, w http.ResponseWriter, r *http.Request
 func HostExecResultHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) (err error) {
 	defer func() {
 		if err := recover(); err != nil {
-			logrus.Errorf("host exec result recover from %v", err)
+			log.With(nil).Errorf("host exec result recover from %v", err)
 		}
 	}()
 	result := callbackResult{}
@@ -364,7 +364,7 @@ func clean() {
 					}
 				}
 			} else {
-				logrus.Errorf("file walk error. %v", err)
+				log.With(nil).Errorf("file walk error. %v", err)
 			}
 			return err
 		})

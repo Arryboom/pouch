@@ -15,10 +15,10 @@ import (
 
 	"github.com/alibaba/pouch/pkg/exec"
 	"github.com/alibaba/pouch/pkg/kernel"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/system"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -131,7 +131,7 @@ func StartQuotaDriver(dir string) (string, error) {
 // SetSubtree is used to set quota id for directory.
 func SetSubtree(dir string, qid uint32) (uint32, error) {
 	if isRegular, err := CheckRegularFile(dir); err != nil || !isRegular {
-		logrus.Debugf("set quota skip not regular file: %s", dir)
+		log.With(nil).Debugf("set quota skip not regular file: %s", dir)
 		return 0, err
 	}
 
@@ -140,9 +140,9 @@ func SetSubtree(dir string, qid uint32) (uint32, error) {
 
 // SetDiskQuota is used to set quota for directory.
 func SetDiskQuota(dir string, size string, quotaID uint32) error {
-	logrus.Infof("set disk quota, dir(%s), size(%s), quotaID(%d)", dir, size, quotaID)
+	log.With(nil).Infof("set disk quota, dir(%s), size(%s), quotaID(%d)", dir, size, quotaID)
 	if isRegular, err := CheckRegularFile(dir); err != nil || !isRegular {
-		logrus.Debugf("set quota skip not regular file: %s", dir)
+		log.With(nil).Debugf("set quota skip not regular file: %s", dir)
 		return err
 	}
 	return GQuotaDriver.SetDiskQuota(dir, size, quotaID)
@@ -161,7 +161,7 @@ func GetQuotaIDInFileAttr(dir string) uint32 {
 // SetQuotaIDInFileAttr is used to set file attributes of quota ID.
 func SetQuotaIDInFileAttr(dir string, id uint32) error {
 	if isRegular, err := CheckRegularFile(dir); err != nil || !isRegular {
-		logrus.Debugf("set quota skip not regular file: %s", dir)
+		log.With(nil).Debugf("set quota skip not regular file: %s", dir)
 		return err
 	}
 
@@ -171,7 +171,7 @@ func SetQuotaIDInFileAttr(dir string, id uint32) error {
 // SetQuotaIDInFileAttrNoOutput is used to set file attribute of quota ID without error.
 func SetQuotaIDInFileAttrNoOutput(dir string, quotaID uint32) {
 	if isRegular, err := CheckRegularFile(dir); err != nil || !isRegular {
-		logrus.Debugf("set quota skip not regular file: %s", dir)
+		log.With(nil).Debugf("set quota skip not regular file: %s", dir)
 		return
 	}
 
@@ -250,7 +250,7 @@ func SetQuotaForDir(src string, quotaID uint32) error {
 func CheckRegularFile(file string) (bool, error) {
 	fd, err := os.Lstat(file)
 	if err != nil {
-		logrus.Warnf("failed to check file: %s, err: %v", file, err)
+		log.With(nil).Warnf("failed to check file: %s, err: %v", file, err)
 		return false, err
 	}
 
@@ -272,7 +272,7 @@ func IsSetQuotaID(id string) bool {
 func getOverlayMountInfo(basefs string) (*OverlayMount, error) {
 	output, err := ioutil.ReadFile(procMountFile)
 	if err != nil {
-		logrus.Warnf("failed to read file(%s), err(%v)", procMountFile, err)
+		log.With(nil).Warnf("failed to read file(%s), err(%v)", procMountFile, err)
 		return nil, err
 	}
 
@@ -373,7 +373,7 @@ func loadQuotaIDs(repquotaOpt string) (map[uint32]struct{}, uint32, error) {
 			}
 		}
 	}
-	logrus.Infof("Load repquota ids(%d), list(%v)", len(quotaIDs), quotaIDs)
+	log.With(nil).Infof("Load repquota ids(%d), list(%v)", len(quotaIDs), quotaIDs)
 	return quotaIDs, minID, nil
 }
 
@@ -384,7 +384,7 @@ func getMountpoint(dir string) (string, error) {
 
 	output, err := ioutil.ReadFile(procMountFile)
 	if err != nil {
-		logrus.Warnf("failed to read file(%s), err(%v)", procMountFile, err)
+		log.With(nil).Warnf("failed to read file(%s), err(%v)", procMountFile, err)
 		return "", errors.Wrapf(err, "failed to read file(%s)", procMountFile)
 	}
 
@@ -392,7 +392,7 @@ func getMountpoint(dir string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get device id for dir(%s)", dir)
 	}
-	logrus.Debugf("get dir(%s) device id(%d)", dir, devID)
+	log.With(nil).Debugf("get dir(%s) device id(%d)", dir, devID)
 
 	// /dev/sdb1 /home/pouch ext4 rw,relatime,prjquota,data=ordered 0 0
 	for _, line := range strings.Split(string(output), "\n") {
@@ -425,7 +425,7 @@ func getMountpoint(dir string) (string, error) {
 		return "", errors.Errorf("failed to get mount point of dir(%s)", dir)
 	}
 
-	logrus.Debugf("get the dir(%s)'s mountpoint(%s)", dir, mountPoint)
+	log.With(nil).Debugf("get the dir(%s)'s mountpoint(%s)", dir, mountPoint)
 
 	return mountPoint, nil
 }
@@ -438,7 +438,7 @@ func getMountpointFstype(dir string) (string, string, error) {
 
 	output, err := ioutil.ReadFile(procMountFile)
 	if err != nil {
-		logrus.Warnf("failed to read file(%s), err(%v)", procMountFile, err)
+		log.With(nil).Warnf("failed to read file(%s), err(%v)", procMountFile, err)
 		return "", "", errors.Wrapf(err, "failed to read file(%s)", procMountFile)
 	}
 
@@ -446,7 +446,7 @@ func getMountpointFstype(dir string) (string, string, error) {
 	if err != nil {
 		return "", "", errors.Wrapf(err, "failed to get device id for dir(%s)", dir)
 	}
-	logrus.Debugf("get dir(%s) device id(%d)", dir, devID)
+	log.With(nil).Debugf("get dir(%s) device id(%d)", dir, devID)
 
 	for _, line := range strings.Split(string(output), "\n") {
 		parts := strings.Split(line, " ")
@@ -475,7 +475,7 @@ func getMountpointFstype(dir string) (string, string, error) {
 		return "", "", errors.Errorf("failed to get mount point of dir(%s)", dir)
 	}
 
-	logrus.Debugf("get the dir(%s)'s mountpoint(%s) and fstype(%s)", dir, mountPoint, fsType)
+	log.With(nil).Debugf("get the dir(%s)'s mountpoint(%s) and fstype(%s)", dir, mountPoint, fsType)
 
 	return mountPoint, fsType, nil
 }
@@ -503,7 +503,7 @@ func setDevLimit(dir string, devID uint64) (uint64, error) {
 	// get storage upper limit of the device which the dir is on.
 	var stfs syscall.Statfs_t
 	if err := syscall.Statfs(mp, &stfs); err != nil {
-		logrus.Errorf("failed to get path(%s) limit, err(%v)", mp, err)
+		log.With(nil).Errorf("failed to get path(%s) limit, err(%v)", mp, err)
 		return 0, errors.Wrapf(err, "failed to get path(%s) limit", mp)
 	}
 	limit = stfs.Blocks * uint64(stfs.Bsize)
@@ -512,7 +512,7 @@ func setDevLimit(dir string, devID uint64) (uint64, error) {
 	devLimits[devID] = limit
 	lock.Unlock()
 
-	logrus.Debugf("SetDevLimit: dir(%s), mountpoint(%s), limit(%v) B", dir, mp, limit)
+	log.With(nil).Debugf("SetDevLimit: dir(%s), mountpoint(%s), limit(%v) B", dir, mp, limit)
 	return limit, nil
 }
 
@@ -537,7 +537,7 @@ func checkDevLimit(dir string, size uint64) error {
 		return fmt.Errorf("dir %s quota limit %v must be less than %v", dir, size, limit)
 	}
 
-	logrus.Debugf("succeeded in checkDevLimit (dir %s quota limit %v B) with size %v B", dir, limit, size)
+	log.With(nil).Debugf("succeeded in checkDevLimit (dir %s quota limit %v B) with size %v B", dir, limit, size)
 
 	return nil
 }

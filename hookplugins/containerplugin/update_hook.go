@@ -1,6 +1,7 @@
 package containerplugin
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -8,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/magiconair/properties"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -24,15 +25,15 @@ const enableEnvHistListKey = "pouch.EnableEnvHitList"
 
 // PreUpdate defines plugin point where receives a container update request, in this plugin point user
 // could change the container update body passed-in by http request body.
-func (c *contPlugin) PreUpdate(in io.ReadCloser) (io.ReadCloser, error) {
+func (c *contPlugin) PreUpdate(ctx context.Context, in io.ReadCloser) (io.ReadCloser, error) {
 	return in, nil
 }
 
 // PostUpdate called after update method successful,
 // the method accepts the rootfs path and envs of container.
 // updates env file /etc/profile.d/dockernv.sh and /etc/instanceInfo
-func (c *contPlugin) PostUpdate(rootfs string, env []string) error {
-	logrus.Infof("post update method called")
+func (c *contPlugin) PostUpdate(ctx context.Context, rootfs string, env []string) error {
+	log.With(ctx).Infof("post update method called")
 
 	// if rootfs not exist, return
 	if _, err := os.Stat(rootfs); err != nil {

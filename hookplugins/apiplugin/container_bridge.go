@@ -19,19 +19,19 @@ import (
 	hp "github.com/alibaba/pouch/hookplugins"
 	"github.com/alibaba/pouch/pkg/httputils"
 	"github.com/alibaba/pouch/pkg/kernel"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/utils"
 	"github.com/alibaba/pouch/version"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func getVersionHandler(_ serverTypes.Handler) serverTypes.Handler {
 	return func(ctx context.Context, w http.ResponseWriter, req *http.Request) (err error) {
 		kernelVersion := "<unknown>"
 		if kv, err := kernel.GetKernelVersion(); err != nil {
-			logrus.Warnf("Could not get kernel version: %v", err)
+			log.With(ctx).Warnf("Could not get kernel version: %v", err)
 		} else {
 			kernelVersion = kv.String()
 		}
@@ -161,10 +161,10 @@ type ContainerCreateConfigWrapper struct {
 
 func containerCreateWrapper(h serverTypes.Handler) serverTypes.Handler {
 	return func(ctx context.Context, rw http.ResponseWriter, req *http.Request) error {
-		logrus.Infof("container create wrapper method called")
+		log.With(ctx).Infof("container create wrapper method called")
 
 		buffer, _ := ioutil.ReadAll(req.Body)
-		logrus.Infof("create container with body %s", string(buffer))
+		log.With(ctx).Infof("create container with body %s", string(buffer))
 
 		// decode container config by alidocker-1.12.6 struct
 		configWrapper := &ContainerCreateConfigWrapper{}
@@ -202,7 +202,7 @@ func containerCreateWrapper(h serverTypes.Handler) serverTypes.Handler {
 		if err := json.NewEncoder(&out).Encode(config); err != nil {
 			return err
 		}
-		logrus.Infof("after process create container body is %s", string(out.Bytes()))
+		log.With(ctx).Infof("after process create container body is %s", string(out.Bytes()))
 
 		req.Body = ioutil.NopCloser(&out)
 
@@ -401,20 +401,20 @@ func containerUpdateWrapper(h serverTypes.Handler) serverTypes.Handler {
 			return h(ctx, rw, req)
 		}
 
-		logrus.Infof("container update wrapper method called")
+		log.With(ctx).Infof("container update wrapper method called")
 
 		buffer, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			return err
 		}
-		logrus.Infof("update container with body %s", string(buffer))
+		log.With(ctx).Infof("update container with body %s", string(buffer))
 
 		// decode container config by alidocker-1.12.6 struct
 		updateConfigWrap := &UpdateConfigWrapper{}
 		if err := json.NewDecoder(bytes.NewReader(buffer)).Decode(updateConfigWrap); err != nil {
 			// if can't decode by UpdateConfigWrapper,
 			// we just pass it into pouch daemon to deal with it.
-			logrus.Warn("failed to decode update body, pass it into pouch daemon")
+			log.With(ctx).Warn("failed to decode update body, pass it into pouch daemon")
 			req.Body = ioutil.NopCloser(bytes.NewReader(buffer))
 			return h(ctx, rw, req)
 		}
@@ -430,7 +430,7 @@ func containerUpdateWrapper(h serverTypes.Handler) serverTypes.Handler {
 
 			diskQuota, err = opts.ParseDiskQuota(strings.Split(updateConfigWrap.DiskQuota, ";"))
 			if err != nil {
-				logrus.Errorf("failed to parse update disk quota: %s, err: %v", updateConfigWrap.DiskQuota, err)
+				log.With(ctx).Errorf("failed to parse update disk quota: %s, err: %v", updateConfigWrap.DiskQuota, err)
 				return errors.Wrapf(err, "failed to parse update disk quota(%s)", updateConfigWrap.DiskQuota)
 			}
 		}
@@ -470,7 +470,7 @@ func containerUpdateWrapper(h serverTypes.Handler) serverTypes.Handler {
 			return errors.Wrapf(err, "failed to encode json(%v)", updateConfig)
 		}
 
-		logrus.Infof("after process update container body is %s", string(out.Bytes()))
+		log.With(ctx).Infof("after process update container body is %s", string(out.Bytes()))
 
 		req.Body = ioutil.NopCloser(&out)
 

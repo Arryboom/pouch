@@ -1,26 +1,26 @@
 package containerplugin
 
 import (
+	"context"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/alibaba/pouch/daemon/mgr"
 	networktypes "github.com/alibaba/pouch/network/types"
-
-	"github.com/sirupsen/logrus"
+	"github.com/alibaba/pouch/pkg/log"
 )
 
 // PreStart returns an array of priority and args which will pass to runc, the every priority
 // used to sort the pre start array that pass to runc, network plugin hook always has priority value 0.
 // Prestart copy files to container rootfs
-func (c *contPlugin) PreStart(config interface{}) ([]int, [][]string, error) {
+func (c *contPlugin) PreStart(ctx context.Context, config interface{}) ([]int, [][]string, error) {
 	var (
 		retPriority  = []int{-100}
 		retHookPaths = [][]string{{"/opt/ali-iaas/pouch/bin/prestart_hook"}}
 	)
 
-	logrus.Infof("pre start method called")
+	log.With(ctx).Infof("pre start method called")
 
 	container, ok := config.(*mgr.Container)
 	if !ok {
@@ -54,7 +54,7 @@ func (c *contPlugin) PreStart(config interface{}) ([]int, [][]string, error) {
 // 1. pass Overlay parameters to network plugin like alinet
 // 2. generate mac address from ip address
 // 3. generate priority for the network interface
-func (c *contPlugin) PreCreateEndpoint(cid string, env []string, endpoint *networktypes.Endpoint) error {
+func (c *contPlugin) PreCreateEndpoint(ctx context.Context, cid string, env []string, endpoint *networktypes.Endpoint) error {
 	genericParam := make(map[string]interface{})
 	if getEnv(env, "OverlayNetwork") == optionOn {
 		genericParam["OverlayNetwork"] = optionOn

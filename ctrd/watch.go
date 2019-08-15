@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/alibaba/pouch/pkg/errtypes"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/containerd/containerd"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // Message is used to watch containerd.
@@ -65,7 +65,7 @@ func isChannelClosed(s containerd.ExitStatus) bool {
 	return s.ExitTime().IsZero() && strings.Contains(s.Error().Error(), "transport is closing")
 }
 
-func (w *watch) add(pack *containerPack) {
+func (w *watch) add(ctx context.Context, pack *containerPack) {
 	w.Lock()
 	defer w.Unlock()
 
@@ -89,11 +89,11 @@ func (w *watch) add(pack *containerPack) {
 		// stop unexpected, judge whether channel is broken, if does, skip this message,
 		// since task still running
 		if isChannelClosed(status) {
-			logrus.Warnf("receive exit message since channel broken, %+v", status)
+			log.With(ctx).Warnf("receive exit message since channel broken, %+v", status)
 			return
 		}
 
-		logrus.Infof("the task has quit, id: %s, err: %v, exitcode: %d, time: %v",
+		log.With(ctx).Infof("the task has quit, id: %s, err: %v, exitcode: %d, time: %v",
 			pack.id, status.Error(), status.ExitCode(), status.ExitTime())
 
 		// Also should release quota when the container destroyed
@@ -112,11 +112,11 @@ func (w *watch) add(pack *containerPack) {
 		cleanupFunc := func() error {
 			cleanupOnce.Do(func() {
 				if _, err := pack.task.Delete(context.Background()); err != nil {
-					logrus.Errorf("failed to delete task, container id: %s: %v", pack.id, err)
+					log.With(ctx).Errorf("failed to delete task, container id: %s: %v", pack.id, err)
 				}
 
 				if err := pack.container.Delete(context.Background()); err != nil {
-					logrus.Errorf("failed to delete container, container id: %s: %v", pack.id, err)
+					log.With(ctx).Errorf("failed to delete container, container id: %s: %v", pack.id, err)
 				}
 			})
 			return nil
@@ -128,7 +128,7 @@ func (w *watch) add(pack *containerPack) {
 		if !skipCleanup {
 			for _, hook := range w.hooks {
 				if err := hook(pack.id, msg, cleanupFunc); err != nil {
-					logrus.Errorf("failed to execute the exit hooks: %v", err)
+					log.With(ctx).Errorf("failed to execute the exit hooks: %v", err)
 					break
 				}
 			}
@@ -142,7 +142,7 @@ func (w *watch) add(pack *containerPack) {
 
 	}(w, pack)
 
-	logrus.Infof("success to add container, id: %s", pack.id)
+	log.With(ctx).Infof("success to add container")
 }
 
 func (w *watch) remove(ctx context.Context, id string) error {

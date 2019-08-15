@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/alibaba/pouch/apis/types"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/user"
-	"github.com/containerd/containerd/mount"
-	"github.com/sirupsen/logrus"
 
+	"github.com/containerd/containerd/mount"
 	"github.com/docker/docker/daemon/caps"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -103,13 +103,13 @@ func setupUser(ctx context.Context, c *Container, s *specs.Spec) (err error) {
 	tmpUmount := func(target string) {
 		for i := 0; i < 10; i++ {
 			if err := mount.Unmount(target, 0); err != nil {
-				logrus.Warnf("failed to umount mountfs(%s) in %d times: %s", target, i+1, err)
+				log.With(nil).Warnf("failed to umount mountfs(%s) in %d times: %s", target, i+1, err)
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
 
 		if err := os.RemoveAll(target); err != nil {
-			logrus.Warnf("failed to remove target %s: %s", target, err)
+			log.With(nil).Warnf("failed to remove target %s: %s", target, err)
 		}
 	}
 
@@ -119,7 +119,7 @@ func setupUser(ctx context.Context, c *Container, s *specs.Spec) (err error) {
 			defer tmpUmount(target)
 			passwdPath = c.GetSpecificBasePath(target, user.PasswdFile)
 			groupPath = c.GetSpecificBasePath(target, user.GroupFile)
-			logrus.Infof("graphdriver is block, mount to (%s) get image content", target)
+			log.With(nil).Infof("graphdriver is block, mount to (%s) get image content", target)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package containerplugin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os/exec"
@@ -9,10 +10,10 @@ import (
 
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/hookplugins"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/docker/docker/daemon/caps"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 var extendCapabilities = []string{
@@ -48,8 +49,8 @@ func init() {
 // 14. add net-priority into spec-annotations
 // 15. add annotations with prefix 'annotation.' into spec-annotations, for edas serverless
 // 16. convert label pouch.SupportCgroup to env pouchSupportCgroup. Runc will clear cgroup readonly with this env
-func (c *contPlugin) PreCreate(createConfig *types.ContainerCreateConfig) error {
-	logrus.Infof("pre create method called")
+func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.ContainerCreateConfig) error {
+	log.With(ctx).Infof("pre create method called")
 
 	if createConfig.HostConfig == nil {
 		createConfig.HostConfig = &types.HostConfig{}
@@ -98,7 +99,7 @@ func (c *contPlugin) PreCreate(createConfig *types.ContainerCreateConfig) error 
 			createConfig.NetworkingConfig.EndpointsConfig = make(map[string]*types.EndpointSettings)
 		}
 
-		nwName, err := prepareNetwork(requestedIP, defaultRoute, mask, nic, networkMode,
+		nwName, err := prepareNetwork(ctx, requestedIP, defaultRoute, mask, nic, networkMode,
 			createConfig.NetworkingConfig.EndpointsConfig, env)
 		if err != nil {
 			return err
@@ -111,12 +112,12 @@ func (c *contPlugin) PreCreate(createConfig *types.ContainerCreateConfig) error 
 	if getEnv(createConfig.Env, "ali_admin_uid") == "0" && requestedIP != "" {
 		b, ex := exec.Command("/opt/ali-iaas/pouch/bin/get_admin_uid.sh", requestedIP).CombinedOutput()
 		if ex != nil {
-			logrus.Errorf("get admin uid error, ip is %s, error is %v", requestedIP, ex)
+			log.With(ctx).Errorf("get admin uid error, ip is %s, error is %v", requestedIP, ex)
 			return ex
 		}
 		uid, ex := strconv.Atoi(strings.TrimSpace(string(b)))
 		if ex != nil {
-			logrus.Errorf("get admin uid error, ip is %s, error is %v", requestedIP, ex)
+			log.With(ctx).Errorf("get admin uid error, ip is %s, error is %v", requestedIP, ex)
 			return ex
 		}
 		for i, oneEnv := range createConfig.Env {
@@ -131,7 +132,7 @@ func (c *contPlugin) PreCreate(createConfig *types.ContainerCreateConfig) error 
 	// common vm must run as root
 	mode := getEnv(createConfig.Env, "ali_run_mode")
 	if ("common_vm" == mode || "vm" == mode) && createConfig.User != "root" {
-		logrus.Infof("in common_vm mode, use root user to start container.")
+		log.With(ctx).Infof("in common_vm mode, use root user to start container.")
 		createConfig.User = "root"
 	}
 

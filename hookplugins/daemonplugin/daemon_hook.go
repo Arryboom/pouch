@@ -7,8 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/alibaba/pouch/hookplugins"
-
-	"github.com/sirupsen/logrus"
+	"github.com/alibaba/pouch/pkg/log"
 )
 
 type daemonPlugin struct{}
@@ -22,7 +21,7 @@ func init() {
 // copy config from /etc/pouch/config.json to /etc/sysconfig/pouch
 // and start plugin processes than daemon depended
 func (d *daemonPlugin) PreStartHook() error {
-	logrus.Infof("pre-start hook in daemon is called")
+	log.With(nil).Infof("pre-start hook in daemon is called")
 	configMap := make(map[string]interface{}, 8)
 	if _, ex := os.Stat("/etc/pouch/config.json"); ex == nil {
 		f, err := os.OpenFile("/etc/pouch/config.json", os.O_RDONLY, 0)
@@ -43,7 +42,7 @@ func (d *daemonPlugin) PreStartHook() error {
 	if e != nil {
 		return fmt.Errorf("daemon prestart execute error. %s %v", string(b), e)
 	}
-	logrus.Infof("daemon_prestart output %s", string(b))
+	log.With(nil).Infof("daemon_prestart output %s", string(b))
 
 	go activePlugins()
 	return nil
@@ -51,11 +50,11 @@ func (d *daemonPlugin) PreStartHook() error {
 
 // PreStopHook stops plugin processes than start ed by PreStartHook.
 func (d *daemonPlugin) PreStopHook() error {
-	logrus.Infof("pre-stop hook in daemon is called")
+	log.With(nil).Infof("pre-stop hook in daemon is called")
 	b, e := exec.Command("/opt/ali-iaas/pouch/bin/daemon_prestop.sh").CombinedOutput()
 	if e != nil {
 		return e
 	}
-	logrus.Infof("daemon_prestop output %s", string(b))
+	log.With(nil).Infof("daemon_prestop output %s", string(b))
 	return nil
 }

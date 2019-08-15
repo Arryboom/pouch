@@ -23,13 +23,13 @@ import (
 	"github.com/alibaba/pouch/daemon/config"
 	"github.com/alibaba/pouch/daemon/mgr"
 	"github.com/alibaba/pouch/pkg/errtypes"
+	"github.com/alibaba/pouch/pkg/log"
 	"github.com/alibaba/pouch/pkg/netutils"
 	"github.com/alibaba/pouch/pkg/randomid"
 	"github.com/alibaba/pouch/pkg/utils"
 
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/go-openapi/strfmt"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -230,24 +230,24 @@ func (c *CriManager) recoverFromCreationConflict(ctx context.Context, name strin
 	}
 	id := container.ID
 
-	logrus.Warnf("Unable to create container due to conflict. Attempting to remove container %q", name)
+	log.With(ctx).Warnf("Unable to create container due to conflict. Attempting to remove container %q", name)
 
 	// stop container
 	if _, stopErr := c.StopPodSandbox(ctx, &runtime.StopPodSandboxRequest{PodSandboxId: id}); stopErr == nil {
-		logrus.Warnf("Successfully stopped conflicting container %q", name)
+		log.With(ctx).Warnf("Successfully stopped conflicting container %q", name)
 	} else {
 		return nil, fmt.Errorf("Failed to stop the conflicting container %q: %v", name, stopErr)
 	}
 
 	// remove container
 	if _, rmErr := c.RemovePodSandbox(ctx, &runtime.RemovePodSandboxRequest{PodSandboxId: id}); rmErr == nil {
-		logrus.Warnf("Successfully removed conflicting container %q", name)
+		log.With(ctx).Warnf("Successfully removed conflicting container %q", name)
 	} else {
 		return nil, fmt.Errorf("Failed to remove the conflicting container %q: %v", name, rmErr)
 	}
 
 	// create container
-	logrus.Infof("start to create container %q: %+v", name, createConfig)
+	log.With(ctx).Infof("start to create container %q: %+v", name, createConfig)
 	return c.ContainerMgr.Create(ctx, name, createConfig)
 }
 
@@ -479,7 +479,7 @@ func (c *CriManager) filterInvalidSandboxes(ctx context.Context, sandboxes []*mg
 		// NOTE: what if the worst case that we failed to remove the sandbox and
 		// it is still running?
 		if status != apitypes.StatusRunning && status != apitypes.StatusCreated {
-			logrus.Warnf("filterInvalidSandboxes: remove invalid sandbox %v", sandbox.ID)
+			log.With(ctx).Warnf("filterInvalidSandboxes: remove invalid sandbox %v", sandbox.ID)
 			c.ContainerMgr.Remove(ctx, sandbox.ID, &apitypes.ContainerRemoveOptions{Volumes: true, Force: true})
 		}
 	}

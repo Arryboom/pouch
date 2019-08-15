@@ -12,9 +12,9 @@ import (
 
 	"github.com/alibaba/pouch/pkg/bytefmt"
 	"github.com/alibaba/pouch/pkg/exec"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // PrjQuotaDriver represents project quota driver.
@@ -38,7 +38,7 @@ type PrjQuotaDriver struct {
 
 // EnforceQuota is used to enforce disk quota effect on specified directory.
 func (quota *PrjQuotaDriver) EnforceQuota(dir string) (string, error) {
-	logrus.Debugf("start project quota driver: (%s)", dir)
+	log.With(nil).Debugf("start project quota driver: (%s)", dir)
 
 	devID, err := getDevID(dir)
 	if err != nil {
@@ -66,7 +66,7 @@ func (quota *PrjQuotaDriver) EnforceQuota(dir string) (string, error) {
 		// remount option prjquota for mountpoint
 		exit, stdout, stderr, err := exec.Run(0, "mount", "-o", "remount,prjquota", mountPoint)
 		if err != nil {
-			logrus.Errorf("failed to remount prjquota, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
+			log.With(nil).Errorf("failed to remount prjquota, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
 				mountPoint, stdout, stderr, exit, err)
 			return "", errors.Wrapf(err, "failed to remount prjquota, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 				mountPoint, stdout, stderr, exit)
@@ -76,7 +76,7 @@ func (quota *PrjQuotaDriver) EnforceQuota(dir string) (string, error) {
 	// use tool quotaon to set disk quota for mountpoint
 	_, fstype, err := getMountpointFstype(dir)
 	if err != nil {
-		logrus.Errorf("failed to get filesystem type, dir: (%s), err: (%v)", dir, err)
+		log.With(nil).Errorf("failed to get filesystem type, dir: (%s), err: (%v)", dir, err)
 		return "", errors.Wrapf(err, "failed to get filesystem type, dir: (%s), err: (%v)", dir, err)
 	}
 
@@ -87,7 +87,7 @@ func (quota *PrjQuotaDriver) EnforceQuota(dir string) (string, error) {
 			if strings.Contains(stderr, " File exists") {
 				err = nil
 			} else {
-				logrus.Errorf("failed to quota on, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
+				log.With(nil).Errorf("failed to quota on, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
 					mountPoint, stdout, stderr, exit, err)
 				err = errors.Wrapf(err, "failed to quota on, mountpoint: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 					mountPoint, stdout, stderr, exit)
@@ -108,7 +108,7 @@ func (quota *PrjQuotaDriver) EnforceQuota(dir string) (string, error) {
 // ext4: chattr -p quotaid +P $DIR
 // xfs: xfs_quota -x -c 'project -s -p $DIR quotaid'
 func (quota *PrjQuotaDriver) SetSubtree(dir string, qid uint32) (uint32, error) {
-	logrus.Debugf("set subtree, dir: %s, quotaID: %d", dir, qid)
+	log.With(nil).Debugf("set subtree, dir: %s, quotaID: %d", dir, qid)
 	id := qid
 	var err error
 
@@ -124,14 +124,14 @@ func (quota *PrjQuotaDriver) SetSubtree(dir string, qid uint32) (uint32, error) 
 
 	_, fstype, err := getMountpointFstype(dir)
 	if err != nil {
-		logrus.Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
+		log.With(nil).Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
 		return 0, errors.Wrapf(err, "failed to get fs type, dir: (%s), err: (%v)", dir, err)
 	}
 
 	strid := strconv.FormatUint(uint64(id), 10)
 	if fstype != xfsFS {
 		exit, stdout, stderr, err := exec.Run(0, "chattr", "-p", strid, "+P", dir)
-		logrus.Infof("SetSubtree chattr, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
+		log.With(nil).Infof("SetSubtree chattr, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 			dir, strid, stdout, stderr, exit)
 		return id, errors.Wrapf(err, "failed to chattr, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 			dir, strid, stdout, stderr, exit)
@@ -140,7 +140,7 @@ func (quota *PrjQuotaDriver) SetSubtree(dir string, qid uint32) (uint32, error) 
 	// fstype is xfsFS
 	cmd := fmt.Sprintf("project -s -p %s %s", dir, strid)
 	exit, stdout, stderr, err := exec.Run(0, "xfs_quota", "-x", "-c", cmd)
-	logrus.Infof("SetSubtree xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
+	log.With(nil).Infof("SetSubtree xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 		dir, strid, stdout, stderr, exit)
 	return id, errors.Wrapf(err, "failed to xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 		dir, strid, stdout, stderr, exit)
@@ -150,7 +150,7 @@ func (quota *PrjQuotaDriver) SetSubtree(dir string, qid uint32) (uint32, error) 
 // * quota size: a byte size of requested quota.
 // * quota ID: an ID represent quota attr which is used in the global scope.
 func (quota *PrjQuotaDriver) SetDiskQuota(dir string, size string, quotaID uint32) error {
-	logrus.Debugf("set disk quota, dir: %s, size: %s, quotaID: %d", dir, size, quotaID)
+	log.With(nil).Debugf("set disk quota, dir: %s, size: %s, quotaID: %d", dir, size, quotaID)
 	mountPoint, err := quota.EnforceQuota(dir)
 	if err != nil {
 		return errors.Wrapf(err, "failed to enforce quota, dir: (%s)", dir)
@@ -195,10 +195,10 @@ func (quota *PrjQuotaDriver) SetDiskQuota(dir string, size string, quotaID uint3
 // cgroup /sys/fs/cgroup/memory cgroup rw,nosuid,nodev,noexec,relatime,memory 0 0
 // cgroup /sys/fs/cgroup/blkio cgroup rw,nosuid,nodev,noexec,relatime,blkio 0 0
 func (quota *PrjQuotaDriver) CheckMountpoint(devID uint64) (string, bool, string) {
-	logrus.Debugf("check mountpoint, devID: %d", devID)
+	log.With(nil).Debugf("check mountpoint, devID: %d", devID)
 	output, err := ioutil.ReadFile(procMountFile)
 	if err != nil {
-		logrus.Warnf("failed to read file: (%s), err: (%v)", procMountFile, err)
+		log.With(nil).Warnf("failed to read file: (%s), err: (%v)", procMountFile, err)
 		return "", false, ""
 	}
 
@@ -243,7 +243,7 @@ func (quota *PrjQuotaDriver) CheckMountpoint(devID uint64) (string, bool, string
 		}
 	}
 
-	logrus.Debugf("check device: (%d), mountpoint: (%s), enableQuota: (%v), fsType: (%s)",
+	log.With(nil).Debugf("check device: (%d), mountpoint: (%s), enableQuota: (%v), fsType: (%s)",
 		devID, mountPoint, enableQuota, fsType)
 
 	return mountPoint, enableQuota, fsType
@@ -256,20 +256,20 @@ func (quota *PrjQuotaDriver) CheckMountpoint(devID uint64) (string, bool, string
 // ext4: setquota -P qid $softlimit $hardlimit $softinode $hardinode mountpoint
 // xfs: xfs_quota -x -c 'limit -p bhard=$limit qid' mountpoint
 func (quota *PrjQuotaDriver) setQuota(quotaID uint32, blockLimit uint64, mountPoint string) error {
-	logrus.Debugf("set project quota, quotaID: %d, limit: %d, mountpoint: %s", quotaID, blockLimit, mountPoint)
+	log.With(nil).Debugf("set project quota, quotaID: %d, limit: %d, mountpoint: %s", quotaID, blockLimit, mountPoint)
 
 	quotaIDStr := strconv.FormatUint(uint64(quotaID), 10)
 	blockLimitStr := strconv.FormatUint(blockLimit, 10)
 	_, fstype, err := getMountpointFstype(mountPoint)
 	if err != nil {
-		logrus.Errorf("failed to get fs type, dir: (%s), err: (%v)", mountPoint, err)
+		log.With(nil).Errorf("failed to get fs type, dir: (%s), err: (%v)", mountPoint, err)
 		return errors.Wrapf(err, "failed to get fs type, dir: (%s), err: (%v)", mountPoint, err)
 	}
 
 	// ext4 set project quota limit
 	if fstype != xfsFS {
 		exit, stdout, stderr, err := exec.Run(0, "setquota", "-P", quotaIDStr, "0", blockLimitStr, "0", "0", mountPoint)
-		logrus.Infof("setQuota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
+		log.With(nil).Infof("setQuota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
 			mountPoint, quotaID, blockLimit, stdout, stderr, exit)
 		return errors.Wrapf(err, "failed to set quota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
 			mountPoint, quotaID, blockLimit, stdout, stderr, exit)
@@ -278,7 +278,7 @@ func (quota *PrjQuotaDriver) setQuota(quotaID uint32, blockLimit uint64, mountPo
 	// xfs set project quota limit
 	cmd := fmt.Sprintf("limit -p bhard=%sk %s", blockLimitStr, quotaIDStr)
 	exit, stdout, stderr, err := exec.Run(0, "xfs_quota", "-x", "-c", cmd, mountPoint)
-	logrus.Infof("setQuota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
+	log.With(nil).Infof("setQuota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
 		mountPoint, quotaID, blockLimit, stdout, stderr, exit)
 	return errors.Wrapf(err, "failed to set quota, mountpoint: (%s), quota id: (%d), quota: (%d kbytes), stdout: (%s), stderr: (%s), exit: (%d)",
 		mountPoint, quotaID, blockLimit, stdout, stderr, exit)
@@ -295,7 +295,7 @@ func (quota *PrjQuotaDriver) GetQuotaIDInFileAttr(dir string) uint32 {
 	exit, stdout, stderr, err := exec.Run(0, "lsattr", "-p", parent)
 	if err != nil {
 		// failure, then return invalid value 0 for quota ID.
-		logrus.Errorf("failed to lsattr, dir: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
+		log.With(nil).Errorf("failed to lsattr, dir: (%s), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
 			dir, stdout, stderr, exit, err)
 		return 0
 	}
@@ -308,25 +308,25 @@ func (quota *PrjQuotaDriver) GetQuotaIDInFileAttr(dir string) uint32 {
 		if len(parts) > 2 && parts[2] == dir {
 			// find the corresponding quota ID, return directly.
 			qid, _ = strconv.Atoi(parts[0])
-			logrus.Debugf("get file attr: [%s], quota id: [%d]", dir, qid)
+			log.With(nil).Debugf("get file attr: [%s], quota id: [%d]", dir, qid)
 			return uint32(qid)
 		}
 	}
 
-	logrus.Errorf("failed to get file attr of quota ID for dir %s", dir)
+	log.With(nil).Errorf("failed to get file attr of quota ID for dir %s", dir)
 	return 0
 }
 
 // SetQuotaIDInFileAttr sets file attributes of quota ID for the input directory.
 // The input attributes is quota ID.
 func (quota *PrjQuotaDriver) SetQuotaIDInFileAttr(dir string, quotaID uint32) error {
-	logrus.Debugf("set file attr, dir: %s, quotaID: %d", dir, quotaID)
+	log.With(nil).Debugf("set file attr, dir: %s, quotaID: %d", dir, quotaID)
 
 	strid := strconv.FormatUint(uint64(quotaID), 10)
 
 	_, fstype, err := getMountpointFstype(dir)
 	if err != nil {
-		logrus.Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
+		log.With(nil).Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
 		return errors.Wrapf(err, "failed to get fs type, dir: (%s), err: (%v)", dir, err)
 	}
 
@@ -339,7 +339,7 @@ func (quota *PrjQuotaDriver) SetQuotaIDInFileAttr(dir string, quotaID uint32) er
 	// xfs use xfs_quota to change project id
 	cmd := fmt.Sprintf("project -s -p %s %s", dir, strid)
 	exit, stdout, stderr, err := exec.Run(0, "xfs_quota", "-x", "-c", cmd)
-	logrus.Infof("SetQuotaIDInFileAttr xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
+	log.With(nil).Infof("SetQuotaIDInFileAttr xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 		dir, strid, stdout, stderr, exit)
 	return errors.Wrapf(err, "failed to xfs_quota, dir: (%s), quota id: (%d), stdout: (%s), stderr: (%s), exit: (%d)",
 		dir, quotaID, stdout, stderr, exit)
@@ -351,24 +351,24 @@ func (quota *PrjQuotaDriver) SetQuotaIDInFileAttrNoOutput(dir string, quotaID ui
 
 	_, fstype, err := getMountpointFstype(dir)
 	if err != nil {
-		logrus.Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
+		log.With(nil).Errorf("failed to get fs type, dir: (%s), err: (%v)", dir, err)
 		return
 	}
 
 	if fstype != xfsFS {
 		exit, stdout, stderr, err := exec.Run(0, "chattr", "-p", strid, "+P", dir)
 		if err != nil {
-			logrus.Errorf("failed to chattr, dir: (%s), quota id: (%d), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
+			log.With(nil).Errorf("failed to chattr, dir: (%s), quota id: (%d), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
 				dir, quotaID, stdout, stderr, exit, err)
 		}
 
 	} else {
 		cmd := fmt.Sprintf("project -s -p %s %s", dir, strid)
 		exit, stdout, stderr, err := exec.Run(0, "xfs_quota", "-x", "-c", cmd)
-		logrus.Infof("SetQuotaIDInFileAttrNoOutput xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
+		log.With(nil).Infof("SetQuotaIDInFileAttrNoOutput xfs_quota, dir: (%s), quota id: (%s), stdout: (%s), stderr: (%s), exit: (%d)",
 			dir, strid, stdout, stderr, exit)
 		if err != nil {
-			logrus.Errorf("failed to xfs_quota, dir: (%s), quota id: (%d), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
+			log.With(nil).Errorf("failed to xfs_quota, dir: (%s), quota id: (%d), stdout: (%s), stderr: (%s), exit: (%d), err: (%v)",
 				dir, quotaID, stdout, stderr, exit, err)
 		}
 
@@ -401,6 +401,6 @@ func (quota *PrjQuotaDriver) GetNextQuotaID() (uint32, error) {
 	quota.quotaIDs[id] = struct{}{}
 	quota.lastID = id
 
-	logrus.Debugf("get next project quota id: %d", id)
+	log.With(nil).Debugf("get next project quota id: %d", id)
 	return id, nil
 }

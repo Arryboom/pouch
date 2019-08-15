@@ -1,6 +1,7 @@
 package criplugin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -12,9 +13,9 @@ import (
 	apitypes "github.com/alibaba/pouch/apis/types"
 	runtime "github.com/alibaba/pouch/cri/apis/v1alpha2"
 	critype "github.com/alibaba/pouch/cri/v1alpha2/types"
+	"github.com/alibaba/pouch/pkg/log"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -28,7 +29,7 @@ var (
 	envDiskQuota = "io.alibaba.pouch.vm.env.diskquota"
 )
 
-func updateNetworkEnv(createConfig *apitypes.ContainerCreateConfig, meta *critype.SandboxMeta) error {
+func updateNetworkEnv(ctx context.Context, createConfig *apitypes.ContainerCreateConfig, meta *critype.SandboxMeta) error {
 	// TODO: only support ipv4
 	netNSPath := meta.NetNS
 
@@ -55,7 +56,7 @@ func updateNetworkEnv(createConfig *apitypes.ContainerCreateConfig, meta *crityp
 	if err != nil {
 		return errors.Wrapf(err, "failed to get container's ip and mask, NetNSPath: (%s)", netNSPath)
 	}
-	logrus.Debugf("update network env, ip: (%s), mask: (%s)", ip, mask)
+	log.With(ctx).Debugf("update network env, ip: (%s), mask: (%s)", ip, mask)
 	createConfig.Env = setEnv(createConfig.Env, "RequestedIP", ip)
 	createConfig.Env = setEnv(createConfig.Env, "DefaultMask", mask)
 
@@ -64,7 +65,7 @@ func updateNetworkEnv(createConfig *apitypes.ContainerCreateConfig, meta *crityp
 	if err != nil {
 		return errors.Wrapf(err, "failed to get container's gateway, NetNSPath: (%s)", netNSPath)
 	}
-	logrus.Debugf("update network env, gateway: (%s)", gateway)
+	log.With(ctx).Debugf("update network env, gateway: (%s)", gateway)
 	createConfig.Env = setEnv(createConfig.Env, "DefaultRoute", gateway)
 
 	return nil
