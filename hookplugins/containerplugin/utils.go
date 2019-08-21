@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -378,4 +380,108 @@ func isCpusharePreload(config *types.ContainerConfig) bool {
 	}
 
 	return false
+}
+
+// adaptKataBlockfile provides block files for kata runtime, these block files will
+// be sent to kata runtime as mount point, while kata will mount them as block device
+// in kata container instead of 9pfs. Before the function called, Container Parameters:
+//  {
+//  	"Config": {
+//  		"Env" : [
+//				"pouch_kata_blockfile_host_container_path" : "raw.file:/home/t4;raw.file:/home/",
+//				"pouch_kata_blockfile_fs_type" : "ext4",
+//				...
+//  				],
+//  			},
+//		"Mounts":[
+//			{
+//				"Source": "/tmp/blockdir1/",
+//				"Destination": "/home/t4",
+//			},
+//			{
+//				"Source": "/tmp/raw.file",
+//				"Destination": "/home",
+//			},
+//			...
+//		]
+//	}
+//
+//	The env of "pouch_kata_blockfile_host_container_path" tells the block file mounts in Mounts, the env contains
+//	array of "<relativePathInHostPath>:<containerPath>" which is split by ";". .As here, the Destination are
+//	"/home/t4" and  "/home" in Mounts, and first part <relativePathInHostPath> will be joined the Source if the path
+// is dir, in consideration of k8s CSI only set bind mount of dir path. The env of "pouch_kata_blockfile_fs_type" will
+// set to mount type. After Calling function, Container Parameters:
+//     {
+//		"Mounts":[
+//			{
+//				"Source": "/tmp/blockdir1/raw.file",
+//				"Destination": "/home/t4",,
+//				"Type" : "ext4"
+//			},
+//			{
+//				"Source": "/tmp/raw.file",
+//				"Destination": "/home",
+//				"Type": "ext4"
+//			},
+//			...
+//		],
+//		...
+//   }
+func adaptKataBlockfile(c *mgr.Container) error {
+	var (
+		blockfilePaths string
+		fsType         string
+	)
+
+	if !(c.HostConfig.Runtime == "kata-runtime") {
+		return nil
+	}
+
+	blockfilePaths = getEnv(c.Config.Env, blockFileEnvKey)
+	if blockfilePaths == "" {
+		return nil
+	}
+
+	dstSrcMap := map[string]string{}
+	srcDstPaths := strings.Split(blockfilePaths, ";")
+	for _, ph := range srcDstPaths {
+		kvs := strings.Split(ph, ":")
+		if len(kvs) != 2 {
+			return fmt.Errorf("blockfilePaths is invaild: %s", blockfilePaths)
+		}
+
+		dstSrcMap[kvs[1]] = kvs[0]
+	}
+
+	fsType = getEnv(c.Config.Env, blockFileTypeEnvKey)
+	if fsType == "" {
+		fsType = "ext4"
+	}
+
+	if _, ok := blockFileTypeMap[fsType]; !ok {
+		return fmt.Errorf("not support fs type %s for blockfile", fsType)
+	}
+
+	for _, mount := range c.Mounts {
+		srcRelativePath, exist := dstSrcMap[mount.Destination]
+		if !exist {
+			continue
+		}
+
+		fi, err := os.Stat(mount.Source)
+		if err != nil {
+			return fmt.Errorf("mount src path stat error: %v", err)
+		}
+
+		// if src is dir, join srcRelativePath to the dir
+		if fi.IsDir() {
+			mount.Source = filepath.Join(mount.Source, srcRelativePath)
+		}
+
+		mount.Type = fsType
+
+		log.With(nil).Infof("blockfile src path: %s, dest path: %s, fs type %s", mount.Source, mount.Destination, fsType)
+	}
+
+	return nil
 }

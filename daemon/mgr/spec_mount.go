@@ -89,7 +89,16 @@ func mergeContainerMount(mounts []specs.Mount, c *Container, s *specs.Spec) ([]s
 			}
 		}
 
-		opts := []string{"rbind"}
+		mountType := "bind"
+		opts := []string{}
+
+		// if mount type is set to ext4 ext3 or xfs, set it to spec mount type
+		if mp.Type == "ext4" || mp.Type == "ext3" || mp.Type == "xfs" {
+			mountType = mp.Type
+		} else {
+			opts = append(opts, "rbind")
+		}
+
 		if !mp.RW {
 			opts = append(opts, "ro")
 		}
@@ -105,7 +114,7 @@ func mergeContainerMount(mounts []specs.Mount, c *Container, s *specs.Spec) ([]s
 		mounts = append(mounts, specs.Mount{
 			Source:      mp.Source,
 			Destination: mp.Destination,
-			Type:        "bind",
+			Type:        mountType,
 			Options:     opts,
 		})
 	}

@@ -32,6 +32,12 @@ func (c *contPlugin) PreStart(ctx context.Context, config interface{}) ([]int, [
 	//add pouch environment pouch_container_image and pouch_container_id
 	container.Config.Env = addEnvironment(container.Config.Image, container.ID, container.HostConfig.Runtime, container.Config.Env)
 
+	// change mount type of blockfile for kata
+	err := adaptKataBlockfile(container)
+	if err != nil {
+		return retPriority, retHookPaths, err
+	}
+
 	// if copyPodHosts is set, update config and add prestart hook
 	if isCopyPodHostsOn(container.Config, container.HostConfig) {
 		pri, prestartArgs := updateContainerForPodHosts(container)
