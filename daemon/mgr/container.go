@@ -349,7 +349,9 @@ func (mgr *ContainerManager) Restore(ctx context.Context) error {
 // Create checks passed in parameters and create a Container object whose status is set at Created.
 func (mgr *ContainerManager) Create(ctx context.Context, name string, createConfig *types.ContainerCreateConfig) (resp *types.ContainerCreateResp, err error) {
 	currentSnapshotter := ctrd.CurrentSnapshotterName(ctx)
-	createConfig.Snapshotter = currentSnapshotter
+	if createConfig.Snapshotter == "" {
+			createConfig.Snapshotter = currentSnapshotter
+	}
 
 	// set container runtime, PreStart need runtime
 	if createConfig.HostConfig.Runtime == "" {
@@ -361,12 +363,6 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, createConf
 		if ex := mgr.containerPlugin.PreCreate(ctx, createConfig); ex != nil {
 			return nil, errors.Wrapf(ex, "pre-create plugin point execute failed")
 		}
-	}
-
-	// Attention, since we support multi snapshotter, if snapshotter not changed,
-	// means plugin not change it, so remove value in case to effect origin logic
-	if createConfig.Snapshotter == currentSnapshotter {
-		createConfig.Snapshotter = ""
 	}
 
 	// NOTE: choose snapshotter, snapshotter can only be set

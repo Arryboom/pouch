@@ -1358,5 +1358,9 @@ func applyContainerConfigByAnnotation(annotations map[string]string, config *api
 		}
 	}
 
+	if snapshotter, ok := annotations[anno.SnapshotterExtendAnnotation]; ok {
+		config.Snapshotter = snapshotter
+	}
+
 	return nil
 }

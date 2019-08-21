@@ -2407,7 +2407,7 @@ definitions:
       Snapshotter:
         description: |
             The snapshotter container choose, can be different with
-            default snapshotter. The Field only set through hook plugin.
+            default snapshotter.
         type: "string"
 
   ContainerCreateResp:

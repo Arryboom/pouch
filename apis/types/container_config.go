@@ -111,7 +111,7 @@ type ContainerConfig struct {
 	Shell []string `json:"Shell"`
 
 	// The snapshotter container choose, can be different with
-	// default snapshotter. The Field only set through hook plugin.
+	// default snapshotter.
 	//
 	Snapshotter string `json:"Snapshotter,omitempty"`
 

@@ -38,6 +38,13 @@ const (
 	// PidsLimitExtendAnnotation is the extend annotation of pids limit
 	PidsLimitExtendAnnotation = "io.alibaba.pouch.resources.pids-limit"
 
+	// SnapshotterExtendAnnotation is the extend annotation for containerd snapshotter
+	//
+	// CRI doesn't allow user to choose image storage(snapshotter) for container
+	// so that SnapshotterExtendAnnotation can help user to use different
+	// image storage for container
+	SnapshotterExtendAnnotation = "io.alibaba.pouch.snapshotter"
+
 	// CNIBandwidthIngress is the desired incoming bandwidth rate limits in bps.
 	CNIBandwidthIngress = "kubernetes.io/ingress-bandwidth"
 
