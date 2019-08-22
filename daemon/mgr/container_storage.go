@@ -110,12 +110,6 @@ func (mgr *ContainerManager) generateMountPoints(ctx context.Context, c *Contain
 		m.Destination = filepath.Clean(m.Destination)
 	}
 
-	// populate the volumes
-	err = mgr.populateVolumes(ctx, c)
-	if err != nil {
-		return errors.Wrap(err, "failed to populate volumes")
-	}
-
 	return nil
 }
 
@@ -368,7 +362,7 @@ func (mgr *ContainerManager) getMountPointFromContainers(ctx context.Context, co
 	return nil
 }
 
-func (mgr *ContainerManager) populateVolumes(ctx context.Context, c *Container) error {
+func (mgr *ContainerManager) populateVolumes(ctx context.Context, c *Container, qms []*quota.QMap) error {
 	// sort mounts by destination directory string shortest length.
 	// the reason is: there are two mounts: /home/admin and /home/admin/log,
 	// when do copy data with dr mode, if the data of /home/admin/log is copied first,
@@ -389,7 +383,7 @@ func (mgr *ContainerManager) populateVolumes(ctx context.Context, c *Container) 
 
 		imagePath := path.Join(c.MountFS, mp.Destination)
 
-		err := copyImageContent(ctx, imagePath, mp.Source)
+		err := copyImageContent(ctx, imagePath, mp.Source, qms)
 		if err != nil {
 			log.With(ctx).Errorf("failed to copy image contents, volume[imagepath(%s), source(%s)], err(%v)", imagePath, mp.Source, err)
 			return errors.Wrapf(err, "failed to copy image content, image(%s), host(%s)", imagePath, mp.Source)
@@ -519,35 +513,24 @@ func (mgr *ContainerManager) getDiskQuotaMountPoints(ctx context.Context, c *Con
 	return mounts, nil
 }
 
-func checkDupQuotaMap(qms []*quota.QMap, qm *quota.QMap) *quota.QMap {
-	for _, prev := range qms {
-		if qm.Expression != "" && qm.Expression == prev.Expression {
-			return prev
-		}
-	}
-	return nil
-}
-
-func (mgr *ContainerManager) setDiskQuota(ctx context.Context, c *Container, mounted bool, update bool) error {
+func (mgr *ContainerManager) prepareQuotaMap(ctx context.Context, c *Container, mounted bool) ([]*quota.QMap, error) {
+	// get default quota
 	var (
-		err           error
+		quotas        = c.Config.DiskQuota
 		globalQuotaID uint32
 	)
-
-	// get default quota
-	quotas := c.Config.DiskQuota
 
 	if quota.IsSetQuotaID(c.Config.QuotaID) {
 		id, err := strconv.Atoi(c.Config.QuotaID)
 		if err != nil {
-			return errors.Wrapf(err, "invalid argument, QuotaID(%s)", c.Config.QuotaID)
+			return nil, errors.Wrapf(err, "invalid argument, QuotaID(%s)", c.Config.QuotaID)
 		}
 
 		// if QuotaID is < 0, it means pouchd alloc a unique quota id.
 		if id < 0 {
 			globalQuotaID, err = quota.GetNextQuotaID()
 			if err != nil {
-				return errors.Wrap(err, "failed to get next quota id")
+				return nil, errors.Wrap(err, "failed to get next quota id")
 			}
 
 			// update QuotaID
@@ -556,11 +539,10 @@ func (mgr *ContainerManager) setDiskQuota(ctx context.Context, c *Container, mou
 			globalQuotaID = uint32(id)
 		}
 	}
-
 	// get mount points that can set disk quota.
 	mounts, err := mgr.getDiskQuotaMountPoints(ctx, c, mounted)
 	if err != nil {
-		return errors.Wrap(err, "failed to get mount point that can set disk quota")
+		return nil, errors.Wrap(err, "failed to get mount point that can set disk quota")
 	}
 
 	var qms []*quota.QMap
@@ -614,7 +596,7 @@ func (mgr *ContainerManager) setDiskQuota(ctx context.Context, c *Container, mou
 				if id == 0 {
 					id, err = quota.GetNextQuotaID()
 					if err != nil {
-						return errors.Wrap(err, "failed to get next quota id")
+						return nil, errors.Wrap(err, "failed to get next quota id")
 					}
 				}
 				qm.QuotaID = id
@@ -625,6 +607,23 @@ func (mgr *ContainerManager) setDiskQuota(ctx context.Context, c *Container, mou
 			qms = append(qms, qm)
 		}
 	}
+
+	return qms, nil
+}
+
+func checkDupQuotaMap(qms []*quota.QMap, qm *quota.QMap) *quota.QMap {
+	for _, prev := range qms {
+		if qm.Expression != "" && qm.Expression == prev.Expression {
+			return prev
+		}
+	}
+	return nil
+}
+
+func (mgr *ContainerManager) setDiskQuota(ctx context.Context, c *Container, update bool, qms []*quota.QMap) error {
+	var (
+		err error
+	)
 
 	// make quota effective
 	for _, qm := range qms {
@@ -762,9 +761,21 @@ func (mgr *ContainerManager) initContainerStorage(ctx context.Context, c *Contai
 		}
 	}()
 
+	mounted := true
 	// parse volume config
 	if err = mgr.generateMountPoints(ctx, c); err != nil {
 		return errors.Wrap(err, "failed to parse volume argument")
+	}
+
+	// prepare quota map
+	qms, err := mgr.prepareQuotaMap(ctx, c, mounted)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare quota maps")
+	}
+
+	// populate the volumes
+	if err = mgr.populateVolumes(ctx, c, qms); err != nil {
+		return errors.Wrap(err, "failed to populate volumes")
 	}
 
 	// try to setup container working directory
@@ -773,7 +784,7 @@ func (mgr *ContainerManager) initContainerStorage(ctx context.Context, c *Contai
 	}
 
 	// set mount point disk quota
-	if err = mgr.setDiskQuota(ctx, c, true, false); err != nil {
+	if err = mgr.setDiskQuota(ctx, c, false, qms); err != nil {
 		// just ignore failed to set disk quota
 		log.With(ctx).Warnf("failed to set disk quota, err(%v)", err)
 	}
@@ -848,7 +859,7 @@ func sortMountPoint(mounts []*types.MountPoint) []*types.MountPoint {
 	return mounts
 }
 
-func copyImageContent(ctx context.Context, source, destination string) error {
+func copyImageContent(ctx context.Context, source, destination string, qms []*quota.QMap) error {
 	fi, err := os.Stat(source)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -872,6 +883,17 @@ func copyImageContent(ctx context.Context, source, destination string) error {
 		}
 	} else if !fi.IsDir() {
 		return nil
+	}
+
+	// first set quota on volume, then copy image content to volume, or file exist in image
+	// can not inherit quota
+	for _, qm := range qms {
+		if qm.Source == destination {
+			if err := quota.SetDiskQuota(qm.Source, qm.Size, qm.QuotaID); err != nil {
+				log.With(ctx).Warnf("failed to set disk quota, directory(%s), size(%s), quota id(%d), err(%v)",
+					qm.Source, qm.Size, qm.QuotaID, err)
+			}
+		}
 	}
 
 	return copyExistContents(ctx, source, destination)

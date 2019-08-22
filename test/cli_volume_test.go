@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/alibaba/pouch/apis/types"
@@ -326,4 +328,41 @@ func volumesToKV(volumes string) map[string][]string {
 		}
 	}
 	return res
+}
+
+// TestContentInVolumeHasQuota tests content copy from image in volume should have quota
+func (suite *PouchVolumeSuite) TestContentInVolumeHasQuota(c *check.C) {
+	// skip other kernel except 4.9 kernel
+	SkipIfFalse(c, func() bool {
+		cmd := "uname -r | grep -q '4.9'"
+		return icmd.RunCommand("bash", "-c", cmd).ExitCode == 0
+
+	})
+
+	funcname := "TestContentInVolumeHasQuota"
+
+	volumeName := "volume_" + funcname
+	volumeName1 := volumeName + "_1"
+	command.PouchRun("volume", "create", "--name", volumeName1).Assert(c, icmd.Success)
+	defer command.PouchRun("volume", "rm", volumeName1)
+
+	volumeName2 := volumeName + "_2"
+	command.PouchRun("volume", "create", "--name", volumeName2).Assert(c, icmd.Success)
+	defer command.PouchRun("volume", "rm", volumeName2)
+
+	ret := command.PouchRun("volume", "inspect", "-f", "{{.Mountpoint}}", volumeName1).Assert(c, icmd.Success)
+	path := strings.TrimSpace(ret.Stdout())
+
+	if path == "" {
+		c.Errorf("volume mountpoint can not be empty")
+	}
+
+	command.PouchRun("run", "-d", "-l", "DiskQuota=10g", "-v", volumeName1+":/home", "-v", volumeName2+":/home/admin", "--name", funcname, alios7u).Assert(c, icmd.Success)
+	defer DelContainerForceMultyTime(c, funcname)
+	data, err := exec.Command("lsattr", "-p", filepath.Join(path, "staragent")).CombinedOutput()
+	c.Assert(err, check.IsNil)
+
+	if !strings.Contains(string(data), "167") {
+		c.Errorf("content copy from image should have quota, but got: %s", data)
+	}
 }
