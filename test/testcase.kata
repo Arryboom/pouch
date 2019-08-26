@@ -205,7 +205,6 @@ PouchExecSuite.TestExecCommand
 PouchExecSuite.TestExecEcho
 PouchExecSuite.TestExecExitCode
 PouchExecSuite.TestExecFail
-PouchExecSuite.TestExecForCloseIO
 PouchExecSuite.TestExecInteractive
 PouchExecSuite.TestExecMultiCommands
 PouchExecSuite.TestExecNoCommand
