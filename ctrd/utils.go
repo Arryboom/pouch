@@ -163,6 +163,7 @@ func (c *Client) getResolver(ctx context.Context, authConfig *types.AuthConfig, 
 	var (
 		availableRef string
 		opt          docker.ResolverOptions
+		resolveErr   error
 	)
 
 	for _, ref := range refs {
@@ -204,15 +205,22 @@ func (c *Client) getResolver(ctx context.Context, authConfig *types.AuthConfig, 
 
 		resolver := docker.NewResolver(opt)
 
-		if _, _, err := resolver.Resolve(ctx, namedRef.String()); err == nil {
+		_, _, err = resolver.Resolve(ctx, namedRef.String())
+		if err == nil {
 			availableRef = namedRef.String()
 			break
+		}
+
+		if errors.Cause(err) == docker.ErrInvalidAuthorization {
+			resolveErr = errors.Wrap(errtypes.ErrInvalidAuthorization, err.Error())
+		} else {
+			resolveErr = errors.Wrap(errtypes.ErrNotfound, err.Error())
 		}
 	}
 
 	if availableRef == "" {
 		log.With(nil).Warnf("there is no available image reference after trying %+q", refs)
-		return nil, "", errtypes.ErrNotfound
+		return nil, "", resolveErr
 	}
 
 	refToName := map[string]string{
