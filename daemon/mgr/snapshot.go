@@ -15,7 +15,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 )
 
@@ -215,7 +214,7 @@ func (s *SnapshotsSyncer) doDiskUsageByNsenter(ctx context.Context, pid int) (sn
 	args := []string{
 		"--target", strconv.Itoa(pid),
 		"--mount", "--uts", "--ipc", "--net", "--pid",
-		"/bin/df", "-h", "/",
+		"/bin/df", "-k", "/",
 	}
 
 	res, err := exec.CommandContext(ctx, "nsenter", args...).CombinedOutput()
@@ -261,7 +260,7 @@ func (s *SnapshotsSyncer) doDiskUsageByNsenter(ctx context.Context, pid int) (sn
 
 	data := strings.TrimSpace(lines[1])
 	values := strings.Fields(data)
-	usedValue, err := units.RAMInBytes(values[usedIdx])
+	usedValue, err := strconv.Atoi(values[usedIdx])
 	if err != nil {
 		return snapshots.Usage{}, 0, fmt.Errorf("failed to parse df return data: %v\n%s", err, output)
 	}
@@ -276,6 +275,6 @@ func (s *SnapshotsSyncer) doDiskUsageByNsenter(ctx context.Context, pid int) (sn
 	}
 
 	return snapshots.Usage{
-		Size: usedValue,
+		Size: int64(usedValue) * int64(1024),
 	}, uint64(usedPercentValue), nil
 }
