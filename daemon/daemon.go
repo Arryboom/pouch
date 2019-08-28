@@ -85,6 +85,10 @@ func NewDaemon(cfg *config.Config) *Daemon {
 		ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithSnapshotterConfig(cfg.Snapshotter, cfg.SnapshotterOpts))
 	}
 
+	for plug, c := range cfg.ProxyPlugins {
+		ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithProxyPluginConfig(plug, c))
+	}
+
 	if cfg.Debug {
 		ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithLogLevel("debug"))
 	}

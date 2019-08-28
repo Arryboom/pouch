@@ -23,6 +23,8 @@ type Config struct {
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
 	Cgroup CgroupConfig `toml:"cgroup"`
+	// ProxyPlugins configures plugins which are communicated to over GRPC
+	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
 
 	md toml.MetaData
 }
@@ -59,4 +61,10 @@ type CgroupConfig struct {
 type V1RuntimeConfig struct {
 	ShimDebug bool   `toml:"shim_debug"`
 	Shim      string `toml:"shim,omitempty"`
+}
+
+// ProxyPlugin provides a proxy plugin configuration
+type ProxyPlugin struct {
+	Type    string `toml:"type"`
+	Address string `toml:"address"`
 }

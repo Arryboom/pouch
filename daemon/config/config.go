@@ -131,6 +131,9 @@ type Config struct {
 	// SnapshotterOpts is options for the snapshotter
 	SnapshotterOpts interface{} `json:"snapshotter_opts,omitempty"`
 
+	// ProxyPlugins are proxy plugin config for containerd
+	ProxyPlugins map[string]map[string]string `json:"proxy-plugins,omitempty"`
+
 	// AllowMultiSnapshotter allows multi snapshotter, default false
 	AllowMultiSnapshotter bool `json:"allow-multi-snapshotter,omitempty"`
 

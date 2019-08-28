@@ -78,3 +78,18 @@ func WithV1RuntimeConfig(shim string) Opt {
 		return nil
 	}
 }
+
+// WithProxyPluginConfig passes down proxy plugin config to containerd
+func WithProxyPluginConfig(s string, c map[string]string) Opt {
+	return func(d *Daemon) error {
+		if d.cfg.ProxyPlugins == nil {
+			d.cfg.ProxyPlugins = map[string]ProxyPlugin{}
+		}
+
+		d.cfg.ProxyPlugins[s] = ProxyPlugin{
+			Type:    c["type"],
+			Address: c["address"],
+		}
+		return nil
+	}
+}
