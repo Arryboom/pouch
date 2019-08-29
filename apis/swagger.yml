@@ -2678,6 +2678,21 @@ definitions:
             x-nullable: true
             additionalProperties:
               type: "string"
+          FixQuotaContainer:
+            description: "fix container total quota set"
+            type: "integer"
+            format: "int"
+            x-nullable: false
+          FixQuotaRootfs:
+            description: "fix container rootfs quota set"
+            type: "integer"
+            format: "int"
+            x-nullable: false
+          FixQuotaVolumes:
+            description: "fix container volume quota set"
+            type: "integer"
+            format: "int"
+            x-nullable: false
 
   ContainerUpgradeConfig:
     description: |

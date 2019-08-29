@@ -82,7 +82,7 @@ func (quota *PrjQuotaDriver) EnforceQuota(dir string) (*MountInfo, error) {
 	}, err
 }
 
-// SetSubtree is used to set quota id for substree dir which is container's root dir.
+// setQuotaID is used to set quota id for substree dir which is container's root dir.
 // For container, it has its own root dir.
 // And this dir is a subtree of the host dir which is mapped to a device.
 // ext4: chattr -p quotaid +P $DIR

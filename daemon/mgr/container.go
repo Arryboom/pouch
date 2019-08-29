@@ -1306,6 +1306,15 @@ func (mgr *ContainerManager) Update(ctx context.Context, name string, config *ty
 	}
 
 	mgr.LogContainerEvent(ctx, c, "update")
+
+	// do fix quota
+
+	if config.FixQuotaContainer != 0 ||
+		config.FixQuotaRootfs != 0 ||
+		config.FixQuotaVolumes != 0 {
+		return mgr.fixQuotaProcess(ctx, c, config)
+	}
+
 	return err
 }
 

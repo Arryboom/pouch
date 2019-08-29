@@ -104,6 +104,11 @@ type container struct {
 
 	//add home dir
 	homeDir string
+
+	// fix quota
+	fixQuotaContainer int64
+	fixQuotaRootfs    int64
+	fixQuotaVolumes   int64
 }
 
 func (c *container) config() (*types.ContainerCreateConfig, error) {

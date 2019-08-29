@@ -56,6 +56,11 @@ func (uc *UpdateCommand) addFlags() {
 	flagSet.StringVar(&uc.restartPolicy, "restart", "", "Restart policy to apply when container exits")
 	flagSet.StringSliceVar(&uc.diskQuota, "disk-quota", nil, "Update disk quota for container(/=10g)")
 	flagSet.StringSliceVar(&uc.specAnnotation, "annotation", nil, "Update annotation for runtime spec")
+
+	// fix quota
+	flagSet.Int64Var(&uc.fixQuotaContainer, "fix-quota-container", 0, "fix container quota, value = -1 or > 16777216, flush container quota id according to the passed quota id, or use origin quota")
+	flagSet.Int64Var(&uc.fixQuotaRootfs, "fix-quota-rootfs", 0, "fix container rootfs, if value = -1 or > 16777216, flush container rootfs quota id according to the passed quota id, or use origin quota")
+	flagSet.Int64Var(&uc.fixQuotaVolumes, "fix-quota-volumes", 0, "fix container all volumes(only local driver) quota, if value = -1 or > 16777216, flush all container volumes with sam    e quota id according to the passed quota id, or use origin quota")
 }
 
 // updateRun is the entry of update command.
@@ -110,6 +115,10 @@ func (uc *UpdateCommand) updateRun(args []string) error {
 		Resources:      resource,
 		DiskQuota:      diskQuota,
 		SpecAnnotation: annotation,
+		// fix quota
+		FixQuotaContainer: uc.fixQuotaContainer,
+		FixQuotaRootfs:    uc.fixQuotaRootfs,
+		FixQuotaVolumes:   uc.fixQuotaVolumes,
 	}
 
 	apiClient := uc.cli.Client()
