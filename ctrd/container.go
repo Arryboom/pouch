@@ -12,6 +12,7 @@ import (
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/daemon/containerio"
 	"github.com/alibaba/pouch/pkg/errtypes"
+	"github.com/alibaba/pouch/pkg/exec"
 	"github.com/alibaba/pouch/pkg/ioutils"
 	"github.com/alibaba/pouch/pkg/log"
 
@@ -424,7 +425,7 @@ func (c *Client) DestroyContainer(ctx context.Context, id string, timeout int64)
 	return msg, nil
 }
 
-// DestroyContainer kill container and delete it.
+// destroyContainer kill container and delete it.
 func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64) (*Message, error) {
 	// TODO(ziren): if we just want to stop a container,
 	// we may need lease to lock the snapshot of container,
@@ -443,7 +444,11 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 
 	pack, err := c.watch.get(id)
 	if err != nil {
-		return nil, err
+		if err := c.forceDestroyContainer(ctx, id); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
 	}
 
 	// if you call DestroyContainer to stop a container, will skip the hooks.
@@ -464,12 +469,27 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 	var msg *Message
 
 	// TODO: set task request timeout by context timeout
-	if err := pack.task.Kill(ctx, syscall.SIGTERM, containerd.WithKillAll); err != nil {
+	nCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+	if err := pack.task.Kill(nCtx, syscall.SIGTERM, containerd.WithKillAll); err != nil {
 		if !errdefs.IsNotFound(err) {
-			return nil, errors.Wrap(err, "failed to kill task")
+			// retry with kill 9
+			nCtxForce, cancelForce := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+			defer cancelForce()
+			if err := pack.task.Kill(nCtxForce, syscall.SIGKILL, containerd.WithKillAll); err != nil {
+				if !errdefs.IsNotFound(err) {
+					// force to kill containerd-shim and all container's threads
+					if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
+						return nil, errors.Wrap(err, "failed to force destroy container")
+					}
+				}
+				goto clean
+			}
+		} else {
+			goto clean
 		}
-		goto clean
 	}
+
 	// wait for the task to exit.
 	msg = waitExit()
 
@@ -478,7 +498,10 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 		// timeout, use SIGKILL to retry.
 		if err := pack.task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
 			if !errdefs.IsNotFound(err) {
-				return nil, errors.Wrap(err, "failed to kill task")
+				// force to kill containerd-shim and all container's threads
+				if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
+					return nil, errors.Wrap(err, "failed to force destroy container")
+				}
 			}
 			goto clean
 		}
@@ -512,6 +535,14 @@ clean:
 	log.With(ctx).Infof("success to destroy container")
 
 	return msg, c.watch.remove(ctx, id)
+}
+
+func (c *Client) forceDestroyContainer(ctx context.Context, id string) error {
+	log.With(ctx).Infof("force to kill containerd-shim, containerID(%s)", id)
+
+	exit, stdout, stderr, err := exec.Run(60*time.Second, "/opt/ali-iaas/pouch/bin/make_sure_stop.sh", id)
+	return errors.Wrapf(err, "failed to run make_sure_stop.sh, exit(%d), stdout(%s), stderr(%s)",
+		exit, stdout, stderr)
 }
 
 // PauseContainer pauses container.
