@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/alibaba/pouch/pkg/bytefmt"
 	"github.com/alibaba/pouch/pkg/exec"
 	"github.com/alibaba/pouch/pkg/log"
+	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 )
@@ -367,4 +369,19 @@ func getVFSVersionAndQuotaFile(devID uint64) (string, string, error) {
 	}
 
 	return vfsVersion, quotaFilename, nil
+}
+
+func (quota *GrpQuotaDriver) SetFileAttrRecursive(dir string, quotaID uint32) error {
+	return filepath.Walk(dir, func(path string, fd os.FileInfo, err error) error {
+		if err != nil {
+			logrus.Warnf("setQuota walk dir %s get error %v", path, err)
+			return nil
+		}
+
+		existedQid := quota.GetQuotaIDInFileAttr(path)
+		if existedQid != quotaID {
+			quota.SetQuotaIDInFileAttrNoOutput(path, quotaID)
+		}
+		return nil
+	})
 }

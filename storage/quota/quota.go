@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,6 +83,9 @@ type BaseQuota interface {
 
 	// GetNextQuotaID gets next quota ID in global scope of host.
 	GetNextQuotaID() (uint32, error)
+
+	// SetFileAttrRecursive set the file attr by recursively.
+	SetFileAttrRecursive(dir string, quotaID uint32) error
 }
 
 // NewQuotaDriver returns a quota instance.
@@ -206,11 +208,6 @@ func SetRootfsDiskQuota(basefs, size string, quotaID uint32, update bool) (uint3
 	}
 
 	for _, dir := range []string{overlayMountInfo.Upper, overlayMountInfo.Work} {
-		_, err = StartQuotaDriver(dir)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to start dir(%s) quota driver", dir)
-		}
-
 		if quotaID == 0 {
 			quotaID, err = GetQuotaID(dir)
 			if err != nil {
@@ -223,8 +220,8 @@ func SetRootfsDiskQuota(basefs, size string, quotaID uint32, update bool) (uint3
 		}
 
 		if update {
-			go SetQuotaForDir(dir, quotaID)
-		} else if err := SetQuotaForDir(dir, quotaID); err != nil {
+			go SetFileAttrRecursive(dir, quotaID)
+		} else if err := SetFileAttrRecursive(dir, quotaID); err != nil {
 			return 0, errors.Wrapf(err, "failed to set dir(%s) quota recursively", dir)
 		}
 	}
@@ -232,18 +229,9 @@ func SetRootfsDiskQuota(basefs, size string, quotaID uint32, update bool) (uint3
 	return quotaID, nil
 }
 
-// SetQuotaForDir sets file attribute
-func SetQuotaForDir(src string, quotaID uint32) error {
-	filepath.Walk(src, func(path string, fd os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("setQuota walk dir %s get error %v", path, err)
-		}
-
-		SetQuotaIDInFileAttrNoOutput(path, quotaID)
-		return nil
-	})
-
-	return nil
+// SetFileAttrRecursive set the file attr by recursively.
+func SetFileAttrRecursive(dir string, quotaID uint32) error {
+	return GQuotaDriver.SetFileAttrRecursive(dir, quotaID)
 }
 
 // CheckRegularFile is used to check the file is regular file or directory.
