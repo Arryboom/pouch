@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -26,7 +27,9 @@ func init() {
 func (suite *APIContainerCreateSuite) SetUpTest(c *check.C) {
 	SkipIfFalse(c, environment.IsLinux)
 
+	environment.PruneAllImages(apiClient)
 	PullImage(c, busyboxImage)
+	PullImage(c, fmt.Sprintf("%s@%s", busyboxImage125, environment.Busybox125Digest))
 }
 
 // TestBasic test create api is ok.
@@ -190,6 +193,50 @@ func (suite *APIContainerCreateSuite) TestNonExistingImg(c *check.C) {
 	resp, err := request.Post("/containers/create", body)
 	c.Assert(err, check.IsNil)
 	CheckRespStatus(c, resp, 404)
+}
+
+// TestUsingNameTagFormatFirstIfImageIsID tests using name:tag first if pass image id to create container.
+func (suite *APIContainerCreateSuite) TestUsingNameTagFormatFirstIfImageIsID(c *check.C) {
+	cname := "TestUsingNameTagFormatFirstIfImageIsID"
+
+	for idx, tc := range []struct {
+		imageID     string
+		expectdName string
+	}{
+		{
+			imageID:     environment.BusyboxID,
+			expectdName: busyboxImage,
+		},
+		{
+			imageID:     environment.Busybox125ID,
+			expectdName: fmt.Sprintf("%s@%s", busyboxImage, environment.Busybox125Digest),
+		},
+	} {
+		tcname := fmt.Sprintf("%s-%v", cname, idx+1)
+
+		q := url.Values{}
+		q.Add("name", tcname)
+		query := request.WithQuery(q)
+
+		obj := map[string]interface{}{
+			"Image":      tc.imageID,
+			"HostConfig": map[string]interface{}{},
+		}
+		body := request.WithJSONBody(obj)
+
+		resp, err := request.Post("/containers/create", query, body)
+		c.Assert(err, check.IsNil)
+		CheckRespStatus(c, resp, 201)
+		defer DelContainerForceMultyTime(c, tcname)
+
+		resp, err = request.Get("/containers/" + tcname + "/json")
+		c.Assert(err, check.IsNil)
+		CheckRespStatus(c, resp, 200)
+
+		got := types.ContainerJSON{}
+		c.Assert(request.DecodeBody(&got, resp.Body), check.IsNil)
+		c.Assert(got.Config.Image, check.Equals, tc.expectdName)
+	}
 }
 
 // TestBadParam tests using bad parameter return 400.

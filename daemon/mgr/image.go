@@ -652,6 +652,19 @@ func (mgr *ImageManager) CheckReference(ctx context.Context, idOrRef string) (ac
 		}
 
 		primaryRef = refs[0]
+
+		// NOTE: kubelet will send the image ID to create container
+		// for this case, the pouch will prefer to use name:tag format
+		// because most of people use this format in the pod yaml.
+		// however, the user might use name@digest format in pod yaml.
+		// it is fine. if there is no one to use name:tag corresponding
+		// to name@digest, the pouch will return the name@digest.
+		for _, idxRef := range refs {
+			if reference.IsNameTagged(idxRef) {
+				primaryRef = idxRef
+				break
+			}
+		}
 	} else if primaryRef, err = mgr.localStore.GetPrimaryReference(actualRef); err != nil {
 		return
 	}
