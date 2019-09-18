@@ -1048,6 +1048,14 @@ func (c *CriManager) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 		imageRef = imageInfo.RepoDigests[0]
 	}
 
+	imageName := container.Config.Image
+	_, _, primaryRef, err := c.ImageMgr.CheckReference(ctx, imageInfo.ID)
+	if err != nil {
+		log.With(ctx).Warnf("failed to get primary ref for %s: %v", imageInfo.ID, err)
+	} else {
+		imageName = primaryRef.String()
+	}
+
 	logPath := labels[containerLogPathLabelKey]
 
 	resources := container.HostConfig.Resources
@@ -1055,7 +1063,7 @@ func (c *CriManager) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	status := &runtime.ContainerStatus{
 		Id:          container.ID,
 		Metadata:    metadata,
-		Image:       &runtime.ImageSpec{Image: container.Config.Image},
+		Image:       &runtime.ImageSpec{Image: imageName},
 		ImageRef:    imageRef,
 		Mounts:      mounts,
 		ExitCode:    int32(container.State.ExitCode),
