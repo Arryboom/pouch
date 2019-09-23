@@ -1096,7 +1096,7 @@ func (c *CriManager) getContainerMetrics(ctx context.Context, meta *mgr.Containe
 		return nil, fmt.Errorf("failed to get metadata of container %q: %v", meta.ID, err)
 	}
 
-	sn, err := c.SnapshotStore.Get(meta.SnapshotID)
+	sn, err := c.SnapshotStore.Get(meta.SnapshotID, true)
 	if err == nil {
 		usedBytes = sn.Size
 		inodesUsed = sn.Inodes

@@ -18,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const refreshHitCount int64 = 5
+
 // Snapshot contains the information about the snapshot.
 type Snapshot struct {
 	// Key is the key of the snapshot
@@ -33,6 +35,8 @@ type Snapshot struct {
 	// Timestamp is latest update time (in nanoseconds) of the snapshot
 	// information.
 	Timestamp int64
+	// hitCount is used to count the CRI request
+	hitCount int64
 }
 
 // SnapshotStore stores all snapshots.
@@ -55,10 +59,14 @@ func (s *SnapshotStore) Add(sn Snapshot) {
 
 // Get returns the snapshot with specified key. Returns error if the
 // snapshot doesn't exist.
-func (s *SnapshotStore) Get(key string) (Snapshot, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+func (s *SnapshotStore) Get(key string, isCount bool) (Snapshot, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if sn, ok := s.snapshots[key]; ok {
+		if isCount {
+			sn.hitCount++
+			s.snapshots[key] = sn
+		}
 		return sn, nil
 	}
 	return Snapshot{}, errors.Wrapf(errtypes.ErrNotfound, "snapshot %s", key)
@@ -128,7 +136,7 @@ func (s *SnapshotsSyncer) Sync() error {
 
 	snapshotterTyp := ctrd.CurrentSnapshotterName(context.TODO())
 	for _, info := range infos {
-		sn, err := s.store.Get(info.Name)
+		sn, err := s.store.Get(info.Name, false)
 		if err == nil {
 			// Only update timestamp for non-active snapshot.
 			if sn.Kind == info.Kind && sn.Kind != snapshots.KindActive {
@@ -136,7 +144,16 @@ func (s *SnapshotsSyncer) Sync() error {
 				s.store.Add(sn)
 				continue
 			}
+
+			if sn.Kind == snapshots.KindActive && sn.hitCount <= refreshHitCount {
+				sn.Timestamp = time.Now().UnixNano()
+				s.store.Add(sn)
+
+				log.With(nil).Debugf("skip fetch because key %s doesn't hit refresh condition(hitcount=%v)", info.Name, sn.hitCount)
+				continue
+			}
 		}
+
 		// Get newest stats if the snapshot is new or active.
 		sn = Snapshot{
 			Key:       info.Name,
