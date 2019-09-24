@@ -113,7 +113,7 @@ func (c *CriManager) generateSandboxID(ctx context.Context) (string, error) {
 // '<key>=<value>', which can be understood by pouch.
 func generateEnvList(envs []*runtime.KeyValue) (result []string) {
 	for _, env := range envs {
-		result = append(result, fmt.Sprintf("%s=%s", env.Key, env.Value))
+		result = append(result, fmt.Sprintf("%s=%s", env.GetKey(), env.GetValue()))
 	}
 	return result
 }
@@ -208,12 +208,12 @@ func generateMountBindings(mounts []*runtime.Mount) []string {
 // generated is unique as long as sandbox metadata is unique.
 func makeSandboxName(c *runtime.PodSandboxConfig) string {
 	return strings.Join([]string{
-		kubePrefix,                            // 0
-		sandboxContainerName,                  // 1
-		c.Metadata.Name,                       // 2
-		c.Metadata.Namespace,                  // 3
-		c.Metadata.Uid,                        // 4
-		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
+		kubePrefix,                                      // 0
+		sandboxContainerName,                            // 1
+		c.GetMetadata().GetName(),                       // 2
+		c.GetMetadata().GetNamespace(),                  // 3
+		c.GetMetadata().GetUid(),                        // 4
+		fmt.Sprintf("%d", c.GetMetadata().GetAttempt()), // 5
 	}, nameDelimiter)
 }
 
@@ -319,7 +319,7 @@ func applySandboxSecurityContext(lc *runtime.LinuxPodSandboxConfig, config *apit
 }
 
 // applySandboxLinuxOptions applies LinuxPodSandboxConfig to pouch's HostConfig and ContainerCreateConfig.
-func applySandboxLinuxOptions(hc *apitypes.HostConfig, lc *runtime.LinuxPodSandboxConfig, createConfig *apitypes.ContainerCreateConfig, image string) error {
+func applySandboxLinuxOptions(hc *apitypes.HostConfig, lc *runtime.LinuxPodSandboxConfig, createConfig *apitypes.ContainerCreateConfig) error {
 	if lc == nil {
 		return nil
 	}
@@ -395,7 +395,7 @@ func makeSandboxPouchConfig(config *runtime.PodSandboxConfig, sandboxMeta *metat
 
 	createConfig := &apitypes.ContainerCreateConfig{
 		ContainerConfig: apitypes.ContainerConfig{
-			Hostname:       strfmt.Hostname(config.Hostname),
+			Hostname:       strfmt.Hostname(config.GetHostname()),
 			Image:          image,
 			Labels:         labels,
 			SpecAnnotation: specAnnotation,
@@ -405,14 +405,12 @@ func makeSandboxPouchConfig(config *runtime.PodSandboxConfig, sandboxMeta *metat
 	}
 
 	// Apply linux-specific options.
-	err := applySandboxLinuxOptions(hc, config.GetLinux(), createConfig, image)
+	err := applySandboxLinuxOptions(hc, config.GetLinux(), createConfig)
 	if err != nil {
 		return nil, err
 	}
 	// Apply resource options.
-	if lc := config.GetLinux(); lc != nil {
-		hc.CgroupParent = lc.CgroupParent
-	}
+	hc.CgroupParent = config.GetLinux().GetCgroupParent()
 
 	return createConfig, nil
 }
@@ -528,7 +526,7 @@ func setupSandboxFiles(sandboxRootDir string, config *runtime.PodSandboxConfig) 
 	var err error
 	dnsConfig := config.GetDnsConfig()
 	if dnsConfig != nil {
-		resolvContent, err = parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
+		resolvContent, err = parseDNSOptions(dnsConfig.GetServers(), dnsConfig.GetSearches(), dnsConfig.GetOptions())
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %v", dnsConfig, err)
 		}
@@ -587,7 +585,7 @@ func (c *CriManager) buildPodNetworkConf(id, netnsPath string, config *runtime.P
 	// docs: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
 	// eg.  kubernetes.io/ingress-bandwidth=10M      (10*1000*1000 bits per second)
 	//      kubernetes.io/ingress-bandwidth=10Mi     (10*1024*1024 bits per second)
-	if str, exists := config.Annotations[anno.CNIBandwidthIngress]; exists {
+	if str, exists := config.GetAnnotations()[anno.CNIBandwidthIngress]; exists {
 		v, err := resource.ParseQuantity(str)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse annotation %s: %v", anno.CNIBandwidthIngress, err)
@@ -598,7 +596,7 @@ func (c *CriManager) buildPodNetworkConf(id, netnsPath string, config *runtime.P
 		runtimeConfig.Bandwidth.IngressRate = uint64(v.Value())
 		runtimeConfig.Bandwidth.IngressBurst = math.MaxUint64
 	}
-	if str, exists := config.Annotations[anno.CNIBandwidthEgress]; exists {
+	if str, exists := config.GetAnnotations()[anno.CNIBandwidthEgress]; exists {
 		v, err := resource.ParseQuantity(str)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse annotation %s: %v", anno.CNIBandwidthEgress, err)
@@ -623,12 +621,12 @@ func sandboxNetworkMode(config *runtime.PodSandboxConfig) runtime.NamespaceMode 
 
 func makeContainerName(s *runtime.PodSandboxConfig, c *runtime.ContainerConfig) string {
 	return strings.Join([]string{
-		kubePrefix,                            // 0
-		c.Metadata.Name,                       // 1
-		s.Metadata.Name,                       // 2: sandbox name
-		s.Metadata.Namespace,                  // 3: sandbox namespace
-		s.Metadata.Uid,                        // 4: sandbox uid
-		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
+		kubePrefix,                                      // 0
+		c.GetMetadata().GetName(),                       // 1
+		s.GetMetadata().GetName(),                       // 2: sandbox name
+		s.GetMetadata().GetNamespace(),                  // 3: sandbox namespace
+		s.GetMetadata().GetUid(),                        // 4: sandbox uid
+		fmt.Sprintf("%d", c.GetMetadata().GetAttempt()), // 5
 	}, nameDelimiter)
 }
 
@@ -854,7 +852,7 @@ func modifyContainerConfig(sc *runtime.LinuxContainerSecurityContext, config *ap
 
 // applyContainerSecurityContext updates pouch container options according to security context.
 func applyContainerSecurityContext(lc *runtime.LinuxContainerConfig, podSandboxID string, config *apitypes.ContainerConfig, hc *apitypes.HostConfig) error {
-	sc := lc.SecurityContext
+	sc := lc.GetSecurityContext()
 	err := modifyContainerConfig(sc, config)
 	if err != nil {
 		return err
@@ -877,35 +875,30 @@ func (c *CriManager) updateCreateConfig(createConfig *apitypes.ContainerCreateCo
 
 	createConfig.HostConfig.EnableLxcfs = sandboxMeta.LxcfsEnabled
 
-	if lc := config.GetLinux(); lc != nil {
-		resources := lc.GetResources()
-		if resources != nil {
-			createConfig.HostConfig.Resources.CPUPeriod = resources.GetCpuPeriod()
-			createConfig.HostConfig.Resources.CPUQuota = resources.GetCpuQuota()
-			createConfig.HostConfig.Resources.CPUShares = resources.GetCpuShares()
-			createConfig.HostConfig.Resources.Memory = resources.GetMemoryLimitInBytes()
-			createConfig.HostConfig.Resources.CpusetCpus = resources.GetCpusetCpus()
-			createConfig.HostConfig.Resources.CpusetMems = resources.GetCpusetMems()
-		}
-
-		// Apply security context.
-		if err := applyContainerSecurityContext(lc, sandboxMeta.ID, &createConfig.ContainerConfig, createConfig.HostConfig); err != nil {
-			return fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
-		}
+	resources := config.GetLinux().GetResources()
+	if resources != nil {
+		createConfig.HostConfig.Resources.CPUPeriod = resources.GetCpuPeriod()
+		createConfig.HostConfig.Resources.CPUQuota = resources.GetCpuQuota()
+		createConfig.HostConfig.Resources.CPUShares = resources.GetCpuShares()
+		createConfig.HostConfig.Resources.Memory = resources.GetMemoryLimitInBytes()
+		createConfig.HostConfig.Resources.CpusetCpus = resources.GetCpusetCpus()
+		createConfig.HostConfig.Resources.CpusetMems = resources.GetCpusetMems()
 	}
 
-	if len(config.Annotations) > 0 {
+	// Apply security context.
+	if err := applyContainerSecurityContext(config.GetLinux(), sandboxMeta.ID, &createConfig.ContainerConfig, createConfig.HostConfig); err != nil {
+		return fmt.Errorf("failed to apply container security context for container %q: %v", config.GetMetadata().GetName(), err)
+	}
+
+	if len(config.GetAnnotations()) > 0 {
 		// Apply container config by annotation
-		if err := applyContainerConfigByAnnotation(config.Annotations, &createConfig.ContainerConfig, createConfig.HostConfig, nil); err != nil {
+		if err := applyContainerConfigByAnnotation(config.GetAnnotations(), &createConfig.ContainerConfig, createConfig.HostConfig, nil); err != nil {
 			return fmt.Errorf("failed to apply container annotation for container %q: %v", config.Metadata.Name, err)
 		}
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.
-	if lc := sandboxConfig.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		createConfig.HostConfig.CgroupParent = lc.CgroupParent
-	}
+	createConfig.HostConfig.CgroupParent = sandboxConfig.GetLinux().GetCgroupParent()
 
 	return nil
 }
