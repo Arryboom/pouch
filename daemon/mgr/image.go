@@ -94,6 +94,9 @@ type ImageMgr interface {
 
 	// GetOCIImageConfig returns the image config of OCI
 	GetOCIImageConfig(ctx context.Context, image string) (ocispec.ImageConfig, error)
+
+	// GetImagePrimaryRefAndName returns the primary reference and name, default returns repo digest and tag.
+	GetImagePrimaryRefAndName(ctx context.Context, image string) (string, string, error)
 }
 
 // ImageManager is an implementation of interface ImageMgr.
@@ -710,6 +713,31 @@ func (mgr *ImageManager) GetOCIImageConfig(ctx context.Context, image string) (o
 		return ocispec.ImageConfig{}, err
 	}
 	return ociImage.Config, nil
+}
+
+// GetImagePrimaryRefAndName returns the primary reference and name, default returns repo digest and tag.
+// Example: return busybox@sha256:1ded4559e2aab2ab3464aae5170ef64afc15bea324a0861b543e2c56a3f29711 and busybox:1.25
+func (mgr *ImageManager) GetImagePrimaryRefAndName(ctx context.Context, image string) (string, string, error) {
+	imageName := image
+
+	imageInfo, err := mgr.GetImage(ctx, image)
+	if err != nil {
+		return "", imageName, err
+	}
+
+	imageRef := imageInfo.ID
+	if len(imageInfo.RepoDigests) > 0 {
+		imageRef = imageInfo.RepoDigests[0]
+	}
+
+	_, _, primaryRef, err := mgr.CheckReference(ctx, imageInfo.ID)
+	if err != nil {
+		log.With(ctx).Warnf("failed to get primary ref for %s: %v", imageInfo.ID, err)
+	} else {
+		imageName = primaryRef.String()
+	}
+
+	return imageRef, imageName, nil
 }
 
 // updateLocalStore updates the local store.

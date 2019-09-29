@@ -970,12 +970,17 @@ func (c *CriManager) ListContainers(ctx context.Context, r *runtime.ListContaine
 	}
 
 	containers := make([]*runtime.Container, 0, len(containerList))
-	for _, c := range containerList {
-		container, err := toCriContainer(c)
+	for _, ctr := range containerList {
+		container, err := toCriContainer(ctr)
 		if err != nil {
-			log.With(ctx).Warnf("failed to translate container %v to cri container in ListContainers: %v", c.ID, err)
+			log.With(ctx).Warnf("failed to translate container %v to cri container in ListContainers: %v", ctr.ID, err)
 			continue
 		}
+
+		if err = c.toCriContainerImage(ctx, ctr, container); err != nil {
+			return nil, err
+		}
+
 		containers = append(containers, container)
 	}
 
@@ -1042,21 +1047,9 @@ func (c *CriManager) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	// so that CRI fails to fetch the running container. Before upgrade
 	// pouch daemon image manager, we use reference to get image instead of
 	// id.
-	imageInfo, err := c.ImageMgr.GetImage(ctx, container.Config.Image)
+	imageRef, imageName, err := c.ImageMgr.GetImagePrimaryRefAndName(ctx, container.Config.Image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image %s: %v", container.Config.Image, err)
-	}
-	imageRef := imageInfo.ID
-	if len(imageInfo.RepoDigests) > 0 {
-		imageRef = imageInfo.RepoDigests[0]
-	}
-
-	imageName := container.Config.Image
-	_, _, primaryRef, err := c.ImageMgr.CheckReference(ctx, imageInfo.ID)
-	if err != nil {
-		log.With(ctx).Warnf("failed to get primary ref for %s: %v", imageInfo.ID, err)
-	} else {
-		imageName = primaryRef.String()
 	}
 
 	logPath := labels[containerLogPathLabelKey]

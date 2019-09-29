@@ -94,13 +94,16 @@ func (s *Server) getContainer(ctx context.Context, rw http.ResponseWriter, req *
 		hostRootPath = mergedDir
 	}
 
+	config := *c.Config
+	_, config.Image, _ = s.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
+
 	container := types.ContainerJSON{
 		ID:           c.ID,
 		Name:         c.Name,
 		Image:        c.Image,
 		Created:      c.Created,
 		State:        c.State,
-		Config:       c.Config,
+		Config:       &config,
 		HostConfig:   c.HostConfig,
 		LogPath:      c.LogPath,
 		Snapshotter:  c.Snapshotter,
@@ -171,10 +174,12 @@ func (s *Server) getContainers(ctx context.Context, rw http.ResponseWriter, req 
 			mounts = append(mounts, *mp)
 		}
 
+		_, imageName, _ := s.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
+
 		singleCon := types.Container{
 			ID:              c.ID,
 			Names:           []string{c.Name},
-			Image:           c.Config.Image,
+			Image:           imageName,
 			ImageID:         c.Image,
 			Command:         strings.Join(c.Config.Cmd, " "),
 			Status:          status,

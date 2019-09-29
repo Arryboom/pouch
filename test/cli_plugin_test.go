@@ -1591,3 +1591,47 @@ func (suite *PouchPluginSuite) TestWmarkRatioCanbeInherit(c *check.C) {
 	res = command.PouchRun("exec", name, "sh", "-c", "cat /sys/fs/cgroup/memory/memory.wmark_ratio").Assert(c, icmd.Success)
 	c.Assert(util.PartialEqual(res.Stdout(), "19"), check.IsNil)
 }
+
+// TestContainerImageTag tests the container image is tag format.
+func (suite *PouchPluginSuite) TestContainerImageTag(c *check.C) {
+	name := "TestContainerImageTag"
+
+	imageDigest := "reg.docker.alibaba-inc.com/pouch/busybox@sha256:1ded4559e2aab2ab3464aae5170ef64afc15bea324a0861b543e2c56a3f29711"
+	imageTag := "reg.docker.alibaba-inc.com/pouch/busybox:1.25"
+
+	res := command.PouchRun("run", "-d", "--name", name, imageDigest, "top")
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	// check in pouch inspect
+	res = command.PouchRun("inspect", "-f", "{{.Config.Image}}", name)
+	res.Assert(c, icmd.Success)
+
+	// check in pouch ps
+	c.Assert(strings.Contains(res.Stdout(), imageTag), check.Equals, true)
+	res = command.PouchRun("ps")
+	res.Assert(c, icmd.Success)
+
+	found := false
+	for _, line := range strings.Split(res.Stdout(), "\n") {
+		if strings.Contains(line, name) && strings.Contains(line, imageTag) {
+			found = true
+			break
+		}
+	}
+	c.Assert(found, check.Equals, true)
+
+	// check in container env
+	res = command.PouchRun("exec", name, "cat", "/etc/profile.d/pouchenv.sh")
+	res.Assert(c, icmd.Success)
+
+	found = false
+	expect := fmt.Sprintf(`pouch_container_image="%s"`, imageTag)
+	for _, line := range strings.Split(res.Stdout(), "\n") {
+		if strings.Contains(line, expect) {
+			found = true
+			break
+		}
+	}
+	c.Assert(found, check.Equals, true)
+}

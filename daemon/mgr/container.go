@@ -822,11 +822,18 @@ func (mgr *ContainerManager) createContainerdContainer(ctx context.Context, c *C
 	}
 
 	if mgr.containerPlugin != nil {
+		backupImage := c.Config.Image
+
+		_, c.Config.Image, _ = mgr.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
+
 		// TODO: make func PreStart with no data race
 		prioArr, argsArr, err = mgr.containerPlugin.PreStart(ctx, c)
 		if err != nil {
+			c.Config.Image = backupImage
 			return errors.Wrapf(err, "get pre-start hook error from container plugin")
 		}
+		// restore backup image name
+		c.Config.Image = backupImage
 	}
 
 	sw := &SpecWrapper{

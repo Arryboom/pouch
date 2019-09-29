@@ -903,6 +903,19 @@ func (c *CriManager) updateCreateConfig(createConfig *apitypes.ContainerCreateCo
 	return nil
 }
 
+// UpdateContainerImage updates the ImageRef to repo:digest.
+func (c *CriManager) toCriContainerImage(ctx context.Context, ctr *mgr.Container, container *runtime.Container) error {
+	imageRef, imageName, err := c.ImageMgr.GetImagePrimaryRefAndName(ctx, ctr.Config.Image)
+	if err != nil {
+		return fmt.Errorf("failed to get image %s: %v", ctr.Config.Image, err)
+	}
+
+	container.ImageRef = imageRef
+	container.Image.Image = imageName
+
+	return nil
+}
+
 func toCriContainerState(state *apitypes.ContainerState) (criState runtime.ContainerState, reason string) {
 	if state == nil {
 		return runtime.ContainerState_CONTAINER_UNKNOWN, "container state is nil"
