@@ -200,7 +200,7 @@ func (mgr *ContainerManager) List(ctx context.Context, option *ContainerListOpti
 	for id, obj := range list {
 		c, ok := obj.(*Container)
 		if !ok {
-			log.With(ctx).Warningf("getting container list, drop partial container cache %p", id)
+			log.With(ctx).Debugf("getting container list, drop partial container cache %s", id)
 			continue
 		}
 
