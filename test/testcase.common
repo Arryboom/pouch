@@ -290,6 +290,7 @@ PouchPluginSuite.TestShmSizeIsHalfOfMemory
 PouchPluginSuite.TestTrimPrefixContainerSlash
 PouchPluginSuite.TestUidFromIp
 PouchPluginSuite.TestInitWithAdminUid
+PouchPluginSuite.TestWmarkRatioCanbeInherit
 PouchPsSuite.TestPsAll
 PouchPsSuite.TestPsFilterEqual
 PouchPsSuite.TestPsFilterInvalid

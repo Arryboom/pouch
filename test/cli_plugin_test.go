@@ -1563,3 +1563,31 @@ func (suite *PouchPluginSuite) TestVMModeUlimit(c *check.C) {
 	out = command.PouchRun("exec", name, "bash", "-c", cmd).Assert(c, icmd.Success)
 	c.Assert(util.PartialEqual(out.Stdout(), "40960"), check.IsNil)
 }
+
+// TestWmarkRatioCanbeInherit test wmark_ratio can be inherit parent value
+func (suite *PouchPluginSuite) TestWmarkRatioCanbeInherit(c *check.C) {
+	SkipIfFalse(c, func() bool {
+		if _, err := os.Stat("/sys/fs/cgroup/memory/memory.wmark_ratio"); err == nil {
+			return true
+		}
+		return false
+	})
+
+	name := "TestWmarkRatioCanbeInherit"
+
+	cgroupParent := "test-wmark-ratio"
+	cgPath := "/sys/fs/cgroup/memory/" + cgroupParent
+	c.Assert(os.Mkdir(cgPath, 0755), check.IsNil)
+	defer os.RemoveAll(cgPath)
+
+	cgFile := filepath.Join(cgPath, "/memory.wmark_ratio")
+	icmd.RunCommand("bash", "-c", "echo 19 > "+cgFile).Assert(c, icmd.Success)
+	val, _ := ioutil.ReadFile(cgFile)
+	c.Assert(util.PartialEqual(string(val), "19"), check.IsNil)
+
+	res := command.PouchRun("run", "-d", "--cgroup-parent", cgroupParent, "--name", name, busyboxImage, "top").Assert(c, icmd.Success)
+	defer DelContainerForceMultyTime(c, name)
+
+	res = command.PouchRun("exec", name, "sh", "-c", "cat /sys/fs/cgroup/memory/memory.wmark_ratio").Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(res.Stdout(), "19"), check.IsNil)
+}
