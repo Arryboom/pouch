@@ -903,8 +903,8 @@ func (c *CriManager) updateCreateConfig(createConfig *apitypes.ContainerCreateCo
 	return nil
 }
 
-// UpdateContainerImage updates the ImageRef to repo:digest.
-func (c *CriManager) toCriContainerImage(ctx context.Context, ctr *mgr.Container, container *runtime.Container) error {
+// updateContainerImage updates the ImageRef to repo:digest.
+func (c *CriManager) updateContainerImage(ctx context.Context, ctr *mgr.Container, container *runtime.Container) error {
 	imageRef, imageName, err := c.ImageMgr.GetImagePrimaryRefAndName(ctx, ctr.Config.Image)
 	if err != nil {
 		return fmt.Errorf("failed to get image %s: %v", ctr.Config.Image, err)

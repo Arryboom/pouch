@@ -977,7 +977,7 @@ func (c *CriManager) ListContainers(ctx context.Context, r *runtime.ListContaine
 			continue
 		}
 
-		if err = c.toCriContainerImage(ctx, ctr, container); err != nil {
+		if err = c.updateContainerImage(ctx, ctr, container); err != nil {
 			return nil, err
 		}
 
