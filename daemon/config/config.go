@@ -140,6 +140,9 @@ type Config struct {
 	// InsecureRegistries sets insecure registries to allow to pull
 	// insecure registries.
 	InsecureRegistries []string `json:"insecure-registries,omitempty"`
+
+	// ShimType allows user specifys shim
+	ShimType string `json:"shim-v1-type,omitempty"`
 }
 
 // GetCgroupDriver gets cgroup driver used in runc.

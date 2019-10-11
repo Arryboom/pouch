@@ -44,20 +44,6 @@ func WithContainerdBinary(nameOrPath string) Opt {
 	}
 }
 
-// WithV1RuntimeShimDebug shows shim log in stdout.
-func WithV1RuntimeShimDebug() Opt {
-	return func(d *Daemon) error {
-		var v1RuntimeCfg = V1RuntimeConfig{ShimDebug: true}
-
-		// FIXME: plugin name is hard code
-		if d.cfg.Plugins == nil {
-			d.cfg.Plugins = map[string]interface{}{}
-		}
-		d.cfg.Plugins["linux"] = v1RuntimeCfg
-		return nil
-	}
-}
-
 // WithSnapshotterConfig passes down snapshotter config to containerd
 func WithSnapshotterConfig(s string, c interface{}) Opt {
 	return func(d *Daemon) error {
@@ -66,6 +52,30 @@ func WithSnapshotterConfig(s string, c interface{}) Opt {
 		}
 
 		d.cfg.Plugins[s] = c
+		return nil
+	}
+}
+
+// WithV1RuntimeShimType set v1 runtime config in containerd
+func WithV1RuntimeConfig(debug bool, shim string) Opt {
+	return func(d *Daemon) error {
+
+		if d.cfg.Plugins == nil {
+			d.cfg.Plugins = map[string]interface{}{}
+		}
+
+		v1RuntimeCfg := V1RuntimeConfig{}
+
+		if debug {
+			v1RuntimeCfg.ShimDebug = debug
+		}
+
+		if shim != "" {
+			v1RuntimeCfg.Shim = shim
+		}
+
+		d.cfg.Plugins["linux"] = v1RuntimeCfg
+
 		return nil
 	}
 }

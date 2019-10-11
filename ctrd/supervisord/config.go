@@ -57,5 +57,6 @@ type CgroupConfig struct {
 // NOTE: don't add other thing here because default config
 // will be merged with this in containerd side.
 type V1RuntimeConfig struct {
-	ShimDebug bool `toml:"shim_debug"`
+	ShimDebug bool   `toml:"shim_debug"`
+	Shim      string `toml:"shim,omitempty"`
 }
