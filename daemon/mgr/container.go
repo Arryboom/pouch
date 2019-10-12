@@ -3,6 +3,7 @@ package mgr
 import (
 	"context"
 	"fmt"
+	"github.com/alibaba/pouch/cri/annotations"
 	"io"
 	"io/ioutil"
 	"os"
@@ -350,7 +351,20 @@ func (mgr *ContainerManager) Restore(ctx context.Context) error {
 func (mgr *ContainerManager) Create(ctx context.Context, name string, createConfig *types.ContainerCreateConfig) (resp *types.ContainerCreateResp, err error) {
 	currentSnapshotter := ctrd.CurrentSnapshotterName(ctx)
 	if createConfig.Snapshotter == "" {
-			createConfig.Snapshotter = currentSnapshotter
+		createConfig.Snapshotter = currentSnapshotter
+
+		// use env value if present
+		for _, key := range createConfig.Env {
+			arr := strings.SplitN(key, "=", 2)
+			if len(arr) != 2 {
+				continue
+			}
+
+			if arr[0] == annotations.SnapshotterExtendAnnotation {
+				createConfig.Snapshotter = arr[1]
+				break
+			}
+		}
 	}
 
 	// set container runtime, PreStart need runtime
