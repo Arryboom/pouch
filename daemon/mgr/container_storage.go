@@ -491,10 +491,12 @@ func (mgr *ContainerManager) getDiskQuotaMountPoints(ctx context.Context, c *Con
 			}
 		}
 
-		// skip non-directory path.
-		if fd, err := os.Stat(mp.Source); err != nil || !fd.IsDir() {
-			log.With(ctx).Debugf("skip non-directory path(%s)", mp.Source)
-			continue
+		if mp.CopyData {
+			// skip non-directory path.
+			if fd, err := os.Stat(mp.Source); err != nil || !fd.IsDir() {
+				log.With(ctx).Debugf("skip non-directory path(%s)", mp.Source)
+				continue
+			}
 		}
 
 		mounts = append(mounts, mp)

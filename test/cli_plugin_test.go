@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/pouch/pkg/randomid"
 	"github.com/alibaba/pouch/test/command"
 	"github.com/alibaba/pouch/test/environment"
 	"github.com/alibaba/pouch/test/util"
@@ -1633,5 +1634,41 @@ func (suite *PouchPluginSuite) TestContainerImageTag(c *check.C) {
 			break
 		}
 	}
+	c.Assert(found, check.Equals, true)
+}
+
+func (suite *PouchPluginSuite) TestLostQuotaIDWithBind(c *check.C) {
+	cname := "TestLostQuotaIDWithBind"
+
+	nonExistDir := fmt.Sprintf("/home/t4/pouch/test%s", randomid.Generate()[:10])
+
+	res := command.PouchRun("run", "-d",
+		"--name", cname,
+		"-v", nonExistDir+":/home/admin/vmcommon",
+		"-v", "/home/admin/test",
+		"-l", "AutoQuotaId=true",
+		"-l", "DiskQuota=10g",
+		alios7u, "sleep", "1000000")
+	defer DelContainerForceMultyTime(c, cname)
+	defer os.RemoveAll(nonExistDir)
+	res.Assert(c, icmd.Success)
+
+	res = command.PouchRun("exec", cname, "df", "/home/admin/vmcommon")
+	res.Assert(c, icmd.Success)
+
+	found := false
+	for _, line := range strings.Split(res.Stdout(), "\n") {
+		fmt.Printf("%s\n", line)
+		parts := strings.Fields(line)
+		if len(parts) != 6 {
+			continue
+		}
+
+		if parts[5] == "/home/admin/vmcommon" && parts[1] == "10485760" {
+			found = true
+			break
+		}
+	}
+
 	c.Assert(found, check.Equals, true)
 }
