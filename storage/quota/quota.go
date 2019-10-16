@@ -180,6 +180,12 @@ func SetFileAttrRecursive(dir string, quotaID uint32) error {
 	return GQuotaDriver.SetFileAttrRecursive(dir, quotaID)
 }
 
+// SetQuotaIDInFileAttr sets file attributes of quota ID for the input directory.
+// The input attributes is quota ID.
+func SetQuotaIDInFileAttr(dir string, quotaID uint32) error {
+	return GQuotaDriver.SetQuotaIDInFileAttr(dir, quotaID)
+}
+
 // CheckRegularFile is used to check the file is regular file or directory.
 func CheckRegularFile(file string) (bool, error) {
 	fd, err := os.Lstat(file)
