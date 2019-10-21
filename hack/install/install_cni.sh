@@ -10,7 +10,6 @@ GOPATH="${GOPATH%%:*}"
 # add bin folder into PATH.
 export PATH="${GOPATH}/bin:${PATH}"
 
-
 # cni::install_cni installs cni plugins.
 cni::install_cni() {
   echo "install cni..."
@@ -22,10 +21,11 @@ cni::install_cni() {
   workdir="${GOPATH}/src/${pkg}"
 
   # downloads github.com/containernetworking/plugins
-  if [ ! -d "${workdir}" ]; then
+  if [ ! -d "${workdir}/.git/" ]; then
+    rm -rf "${workdir}"
     mkdir -p "${workdir}"
     cd "${workdir}"
-    git clone http://gitlab.alibaba-inc.com/pouch/containernetworking-plugins.git .
+    git clone git@gitlab.alibaba-inc.com:pouch/containernetworking-plugins.git .
   fi
   cd "${workdir}"
   git fetch --all
