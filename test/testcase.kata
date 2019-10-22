@@ -338,7 +338,6 @@ PouchRunSuite.TestRunWithSeccomp
 PouchRunSuite.TestRunWithSysctls
 PouchRunSuite.TestRunWithTty
 PouchRunSuite.TestRunWithUTSMode
-PouchRunSuite.TestRunWithoutCapability
 PouchRunSyslogSuite.TestRunRFC5424MicroSeq
 PouchRunUlimitSuite.TestRunWithUlimit
 PouchRunUserSuite.TestRunWithAddUser
