@@ -40,7 +40,7 @@ func (c *Client) CreateSnapshot(ctx context.Context, id, ref string, labels map[
 		return fmt.Errorf("failed to get a containerd grpc client: %v", err)
 	}
 
-	original_ctx := ctx
+	originalCtx := ctx
 	ctx = leases.WithLease(ctx, wrapperCli.lease.ID)
 
 	var (
@@ -89,7 +89,7 @@ func (c *Client) CreateSnapshot(ctx context.Context, id, ref string, labels map[
 		// NOTE: don't use pouchd lease id here because pouchd lease id
 		// will hold the snapshotter forever, which means that the
 		// snapshotter will not removed if we remove image.
-		if werr = image.Unpack(original_ctx, snName); werr != nil {
+		if werr = image.Unpack(originalCtx, snName); werr != nil {
 			log.With(ctx).Warnf("failed to unpack for image %s on %s snapshotter: %v", image.Name(), snName, werr)
 			return err
 		}
