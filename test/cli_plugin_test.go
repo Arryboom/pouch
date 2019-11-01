@@ -1672,3 +1672,28 @@ func (suite *PouchPluginSuite) TestLostQuotaIDWithBind(c *check.C) {
 
 	c.Assert(found, check.Equals, true)
 }
+
+// TestStartHookLogExist test /opt/ali-iaas/pouch/bin/start_hook.sh should created
+// a log named /tmp/start_hook.log in container
+func (suite *PouchPluginSuite) TestStartHookLogExist(c *check.C) {
+	name := "TestStartHookLogExist"
+	res := command.PouchRun("run", "-d", "--name", name, busyboxImage, "top")
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	command.PouchRun("exec", name, "sh", "-c", "ls /tmp/start_hook.log").Assert(c, icmd.Success)
+}
+
+// TestSudoerFileExist tests /etc/sudoers should exist in container
+func (suite *PouchPluginSuite) TestSudoerFileExist(c *check.C) {
+	name := "TestSudoerFileExist"
+	res := command.PouchRun("run", "-d", "--env", "ali_run_mode=common_vm", "--name", name, alios7u)
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	command.PouchRun("exec", name, "sh", "-c", "rm -f /etc/sudoers").Assert(c, icmd.Success)
+	command.PouchRun("restart", name).Assert(c, icmd.Success)
+
+	// check /etc/sudoers can restore through copy
+	command.PouchRun("exec", name, "sh", "-c", "ls /etc/sudoers").Assert(c, icmd.Success)
+}
