@@ -101,9 +101,6 @@ type ContainerMgr interface {
 	// Update updates the configurations of a container.
 	Update(ctx context.Context, name string, config *types.UpdateConfig) error
 
-	// Upgrade upgrades a container with new image and args.
-	Upgrade(ctx context.Context, name string, config *types.ContainerUpgradeConfig) error
-
 	// Top lists the processes running inside of the given container
 	Top(ctx context.Context, name string, psArgs string) (*types.ContainerProcessList, error)
 
@@ -373,11 +370,16 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, config *ty
 		}
 	}()
 
+	// NOTE: don't change user image name
 	imgID, _, primaryRef, err := mgr.ImageMgr.CheckReference(ctx, config.Image)
 	if err != nil {
 		return nil, err
 	}
-	config.Image = primaryRef.String()
+	// NOTE: imgName represents the name which can be used in containerd. Even
+	// though there are a lot of images sharing the same image id, it
+	// doesn't matter. Both the backend image data and snapshotter are
+	// the same.
+	imgName := primaryRef.String()
 
 	// TODO: check request validate.
 	if config.HostConfig == nil {
@@ -440,8 +442,13 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, config *ty
 
 	log.With(ctx).Infof("pouch labels(%+v)", labels)
 	snapID := id
+
 	// create a snapshot with image.
-	if err := mgr.Client.CreateSnapshot(ctx, snapID, config.Image, labels); err != nil {
+	//
+	// NOTE: The user image name might be short name which containerd don't
+	// store it in backend. We need to use the name which containerd knows
+	// about.
+	if err := mgr.Client.CreateSnapshot(ctx, snapID, imgName, labels); err != nil {
 		return nil, err
 	}
 	cleanups = append(cleanups, func() error {
@@ -491,7 +498,7 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, config *ty
 
 	// merge image's config into container
 	if err := container.merge(func() (ocispec.ImageConfig, error) {
-		return mgr.ImageMgr.GetOCIImageConfig(ctx, config.Image)
+		return mgr.ImageMgr.GetOCIImageConfig(ctx, imgName)
 	}); err != nil {
 		return nil, err
 	}
@@ -822,8 +829,17 @@ func (mgr *ContainerManager) createContainerdContainer(ctx context.Context, c *C
 	}
 
 	if mgr.containerPlugin != nil {
+		// FIXME(fuweid): The buggy thing is that the CRI uses image ID
+		// to create container. In internal, PreStart will insert
+		// pouch_image_name env for checking image consistent later.
+		// We need to pick containerd image name. It is not reliable.
+		// Need to update the image consistent policy.
+		//
+		// If user forcely removes the using image, the container
+		// can't restart because the image has been removed. But we
+		// still have snapshotter for container, it should be restarted
+		// successfully, like docker does.
 		backupImage := c.Config.Image
-
 		_, c.Config.Image, _ = mgr.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
 
 		// TODO: make func PreStart with no data race
@@ -868,7 +884,6 @@ func (mgr *ContainerManager) createContainerdContainer(ctx context.Context, c *C
 
 	ctrdContainer := &ctrd.Container{
 		ID:             c.ID,
-		Image:          c.Config.Image,
 		Labels:         c.Config.Labels,
 		RuntimeType:    c.HostConfig.RuntimeType,
 		RuntimeOptions: runtimeOptions,

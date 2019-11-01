@@ -44,7 +44,6 @@ func main() {
 	cli.AddCommand(base, &LoginCommand{})
 	cli.AddCommand(base, &UpdateCommand{})
 	cli.AddCommand(base, &LogoutCommand{})
-	cli.AddCommand(base, &UpgradeCommand{})
 	cli.AddCommand(base, &TopCommand{})
 	cli.AddCommand(base, &LogsCommand{})
 	cli.AddCommand(base, &RemountLxcfsCommand{})

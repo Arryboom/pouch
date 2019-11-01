@@ -58,7 +58,6 @@ func initRoute(s *Server) *mux.Router {
 		{Method: http.MethodPost, Path: "/containers/{name:.*}/pause", HandlerFunc: s.pauseContainer},
 		{Method: http.MethodPost, Path: "/containers/{name:.*}/unpause", HandlerFunc: s.unpauseContainer},
 		{Method: http.MethodPost, Path: "/containers/{name:.*}/update", HandlerFunc: s.updateContainer},
-		{Method: http.MethodPost, Path: "/containers/{name:.*}/upgrade", HandlerFunc: s.upgradeContainer},
 		{Method: http.MethodGet, Path: "/containers/{name:.*}/top", HandlerFunc: s.topContainer},
 		{Method: http.MethodGet, Path: "/containers/{name:.*}/logs", HandlerFunc: withCancelHandler(s.logsContainer)},
 		{Method: http.MethodGet, Path: "/containers/{name:.*}/stats", HandlerFunc: withCancelHandler(s.statsContainer)},

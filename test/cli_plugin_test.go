@@ -1611,14 +1611,14 @@ func (suite *PouchPluginSuite) TestContainerImageTag(c *check.C) {
 	res = command.PouchRun("inspect", "-f", "{{.Config.Image}}", name)
 	res.Assert(c, icmd.Success)
 
-	// check in pouch ps
-	c.Assert(strings.Contains(res.Stdout(), imageTag), check.Equals, true)
+	// check in pouch ps and it should be the same with user's input
+	c.Assert(strings.Contains(res.Stdout(), imageDigest), check.Equals, true)
 	res = command.PouchRun("ps")
 	res.Assert(c, icmd.Success)
 
 	found := false
 	for _, line := range strings.Split(res.Stdout(), "\n") {
-		if strings.Contains(line, name) && strings.Contains(line, imageTag) {
+		if strings.Contains(line, name) && strings.Contains(line, imageDigest) {
 			found = true
 			break
 		}

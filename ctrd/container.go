@@ -612,40 +612,23 @@ func (c *Client) unpauseContainer(ctx context.Context, id string) error {
 
 // CreateContainer create container and start process.
 func (c *Client) CreateContainer(ctx context.Context, container *Container, checkpointDir string) error {
-	var (
-		ref = container.Image
-		id  = container.ID
-	)
+	var id = container.ID
 
 	if !c.lock.TrylockWithRetry(ctx, id) {
 		return errtypes.ErrLockfailed
 	}
 	defer c.lock.Unlock(id)
 
-	if err := c.createContainer(ctx, ref, id, checkpointDir, container); err != nil {
+	if err := c.createContainer(ctx, id, checkpointDir, container); err != nil {
 		return convertCtrdErr(err)
 	}
 	return nil
 }
 
-func (c *Client) createContainer(ctx context.Context, ref, id, checkpointDir string, container *Container) (err0 error) {
+func (c *Client) createContainer(ctx context.Context, id, checkpointDir string, container *Container) (err0 error) {
 	wrapperCli, err := c.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get a containerd grpc client: %v", err)
-	}
-
-	// if creating the container by specify rootfs, we no need use the image
-	if !container.RootFSProvided {
-		// get image
-		img, err := wrapperCli.client.GetImage(ctx, ref)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				return errors.Wrapf(errtypes.ErrNotfound, "image %s", ref)
-			}
-			return errors.Wrapf(err, "failed to get image %s", ref)
-		}
-
-		log.With(ctx).Infof("success to get image %s", img.Name())
 	}
 
 	// create container

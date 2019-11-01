@@ -1049,11 +1049,8 @@ func (c *CriManager) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 
 	labels, annotations := extractLabels(container.Config.Labels)
 
-	// FIXME(fuwei): if user repush image with the same reference, the image
-	// ID will be changed. For now, pouch daemon will remove the old image ID
-	// so that CRI fails to fetch the running container. Before upgrade
-	// pouch daemon image manager, we use reference to get image instead of
-	// id.
+	// NOTE: CRI always use Image ID to create container. We need to random
+	// pick image name for stats response.
 	imageRef, imageName, err := c.ImageMgr.GetImagePrimaryRefAndName(ctx, container.Config.Image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image %s: %v", container.Config.Image, err)

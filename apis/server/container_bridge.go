@@ -95,8 +95,6 @@ func (s *Server) getContainer(ctx context.Context, rw http.ResponseWriter, req *
 	}
 
 	config := *c.Config
-	_, config.Image, _ = s.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
-
 	container := types.ContainerJSON{
 		ID:           c.ID,
 		Name:         c.Name,
@@ -174,12 +172,10 @@ func (s *Server) getContainers(ctx context.Context, rw http.ResponseWriter, req 
 			mounts = append(mounts, *mp)
 		}
 
-		_, imageName, _ := s.ImageMgr.GetImagePrimaryRefAndName(ctx, c.Config.Image)
-
 		singleCon := types.Container{
 			ID:              c.ID,
 			Names:           []string{c.Name},
-			Image:           imageName,
+			Image:           c.Config.Image,
 			ImageID:         c.Image,
 			Command:         strings.Join(c.Config.Cmd, " "),
 			Status:          status,
@@ -392,35 +388,6 @@ func (s *Server) updateContainer(ctx context.Context, rw http.ResponseWriter, re
 
 	if err := s.ContainerMgr.Update(ctx, name, config); err != nil {
 		return httputils.NewHTTPError(err, http.StatusInternalServerError)
-	}
-
-	metrics.ContainerSuccessActionsCounter.WithLabelValues(label).Inc()
-
-	rw.WriteHeader(http.StatusOK)
-	return nil
-}
-
-func (s *Server) upgradeContainer(ctx context.Context, rw http.ResponseWriter, req *http.Request) error {
-	label := util_metrics.ActionUpgradeLabel
-	defer func(start time.Time) {
-		metrics.ContainerActionsCounter.WithLabelValues(label).Inc()
-		metrics.ContainerActionsTimer.WithLabelValues(label).Observe(time.Since(start).Seconds())
-	}(time.Now())
-
-	config := &types.ContainerUpgradeConfig{}
-	// decode request body
-	if err := json.NewDecoder(req.Body).Decode(config); err != nil {
-		return httputils.NewHTTPError(err, http.StatusBadRequest)
-	}
-	// validate request body
-	if err := config.Validate(strfmt.NewFormats()); err != nil {
-		return httputils.NewHTTPError(err, http.StatusBadRequest)
-	}
-
-	name := mux.Vars(req)["name"]
-
-	if err := s.ContainerMgr.Upgrade(ctx, name, config); err != nil {
-		return err
 	}
 
 	metrics.ContainerSuccessActionsCounter.WithLabelValues(label).Inc()

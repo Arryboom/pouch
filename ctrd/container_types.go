@@ -12,7 +12,6 @@ import (
 // The other is create container by specify container rootfs, we use `RootFSProvided` flag to mark it,
 type Container struct {
 	ID             string
-	Image          string
 	RuntimeType    string
 	RuntimeOptions interface{}
 	Labels         map[string]string
