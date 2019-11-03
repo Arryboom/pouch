@@ -1814,30 +1814,50 @@ func (mgr *ContainerManager) attachCRILog(ctx context.Context, c *Container, log
 		return errors.Wrap(errtypes.ErrNotfound, "failed to get containerIO")
 	}
 
-	// using symlink for json-file log
-	if cfg := c.HostConfig.LogConfig; cfg != nil && cfg.LogDriver == types.LogConfigLogDriverJSONFile {
-		containerLog := path.Join(mgr.Store.Path(c.ID), "json.log")
-
-		_, err := os.Stat(containerLog)
-		if os.IsNotExist(err) {
-			log.With(ctx).Warnf("container log %s not found: %v", containerLog, err)
-			return nil
+	// hijack the cri log to prevent /var/log/pods/xxx from disk pressure
+	if cfg := c.HostConfig.LogConfig; cfg != nil {
+		switch cfg.LogDriver {
+		case types.LogConfigLogDriverJSONFile:
+			return mgr.hijackCRIJSONLog(ctx, c, logPath)
+		case types.LogConfigLogDriverSyslog:
+			return mgr.hijackCRISysLog(ctx, c, logPath)
 		}
-
-		// There are three level logs
-		// 1. /var/log/containers/{pod.name}_{pod.namespace}_{containerName}-{containerId}.log
-		// 2. /var/log/pods/{pod.UID}/{containerName}/{restartCount}.log
-		// 3. {Pouch Home dir}/containers/{containerID}/json.log
-		// kubelet will link the level1 and the level2 logs.
-		// We link the level2 and the level3 logs here.
-		// All of the logs above would write to exactly one file.
-		if err := os.Symlink(containerLog, logPath); err != nil {
-			log.With(ctx).Warnf("failed to create symbolic link %s to container %s: %v", logPath, c.ID, err)
-		}
-		return nil
 	}
 
 	return cntrio.AttachCRILog(logPath, c.Config.Tty)
+}
+
+func (mgr *ContainerManager) hijackCRIJSONLog(ctx context.Context, c *Container, logPath string) error {
+	containerLog := path.Join(mgr.Store.Path(c.ID), "json.log")
+
+	_, err := os.Stat(containerLog)
+	if os.IsNotExist(err) {
+		log.With(ctx).Warnf("container log %s not found: %v", containerLog, err)
+		return nil
+	}
+
+	// There are three level logs
+	// 1. /var/log/containers/{pod.name}_{pod.namespace}_{containerName}-{containerId}.log
+	// 2. /var/log/pods/{pod.UID}/{containerName}/{restartCount}.log
+	// 3. {Pouch Home dir}/containers/{containerID}/json.log
+	// kubelet will link the level1 and the level2 logs.
+	// We link the level2 and the level3 logs here.
+	// All of the logs above would write to exactly one file.
+	log.With(ctx).Infof("create symbolic link %s to container %s", logPath, c.ID)
+	if err := os.Symlink(containerLog, logPath); err != nil {
+		log.With(ctx).Warnf("failed to create symbolic link %s to container %s: %v", logPath, c.ID, err)
+	}
+	return nil
+}
+
+func (mgr *ContainerManager) hijackCRISysLog(ctx context.Context, c *Container, logPath string) error {
+	log.With(ctx).Infof("left %s empty for syslog typed container log %v", logPath, c.ID)
+	_, err := os.Stat(logPath)
+	if os.IsNotExist(err) {
+		_, err = os.Create(logPath)
+		return err
+	}
+	return nil
 }
 
 func (mgr *ContainerManager) initExecIO(id string, withStdin bool) (*containerio.IO, error) {
