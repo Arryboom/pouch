@@ -8,79 +8,47 @@ import (
 	"github.com/alibaba/pouch/daemon/config"
 	"github.com/alibaba/pouch/daemon/mgr"
 	"github.com/alibaba/pouch/hookplugins"
-	"github.com/alibaba/pouch/pkg/log"
 )
 
-// RunCriService start cri service if pouchd is specified with --enable-cri.
-func RunCriService(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin, streamRouterCh chan stream.Router, stopCh chan error, readyCh chan bool) {
-	var err error
+type CRIService interface {
+	// Start always return non-nil error.
+	Start(readyCh chan bool) error
+	// Shutdown close the server socket.
+	Shutdown() error
+}
 
-	defer func() {
-		stopCh <- err
-		close(stopCh)
-	}()
+// RunCriService start cri service if pouchd is specified with --enable-cri.
+// if stream.Router is not nil, pouch server should register this router.
+func NewCriService(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, CRIService, error) {
 	if !daemonconfig.IsCriEnabled {
-		// the CriService has been disabled, so send Ready and empty Stream Router
-		streamRouterCh <- nil
-		readyCh <- true
-		return
+		return nil, nil, nil
 	}
 	switch daemonconfig.CriConfig.CriVersion {
 	case "v1alpha2":
-		err = runv1alpha2(daemonconfig, containerMgr, imageMgr, volumeMgr, criPlugin, streamRouterCh, readyCh)
+		return newCRIServiceV1alpha2(daemonconfig, containerMgr, imageMgr, volumeMgr, criPlugin)
 	default:
-		streamRouterCh <- nil
-		readyCh <- false
-		err = fmt.Errorf("failed to start CRI service: invalid CRI version %s, expected to be v1alpha2", daemonconfig.CriConfig.CriVersion)
+		return nil, nil, fmt.Errorf("invalid CRI version %s, expected to be v1alpha2", daemonconfig.CriConfig.CriVersion)
 	}
 }
 
-// Start CRI service with CRI version: v1alpha2
-func runv1alpha2(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin, streamRouterCh chan stream.Router, readyCh chan bool) error {
-	log.With(nil).Infof("Start CRI service with CRI version: v1alpha2")
-	criMgr, err := criv1alpha2.NewCriManager(daemonconfig, containerMgr, imageMgr, volumeMgr, criPlugin)
+// create CRI service with CRI version: v1alpha2
+func newCRIServiceV1alpha2(daemonConfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, CRIService, error) {
+	criMgr, err := criv1alpha2.NewCriManager(daemonConfig, containerMgr, imageMgr, volumeMgr, criPlugin)
 	if err != nil {
-		streamRouterCh <- nil
-		readyCh <- false
-		return fmt.Errorf("failed to get CriManager with error: %v", err)
+		return nil, nil, fmt.Errorf("failed to get CriManager with error: %v", err)
 	}
 
-	service, err := criv1alpha2.NewService(daemonconfig, criMgr)
+	service, err := criv1alpha2.NewService(daemonConfig, criMgr)
 	if err != nil {
-		streamRouterCh <- nil
-		readyCh <- false
-		return fmt.Errorf("failed to start CRI service with error: %v", err)
+		return nil, nil, fmt.Errorf("failed to start CRI service with error: %v", err)
 	}
 
-	errChan := make(chan error, 2)
+	var streamRouter stream.Router
 	// If the cri stream server share the port with pouchd,
-	// export the its router. Otherwise launch it.
-	if daemonconfig.CriConfig.StreamServerReusePort {
-		errChan = make(chan error, 1)
-		streamRouterCh <- criMgr.StreamRouter()
-	} else {
-		go func() {
-			errChan <- criMgr.StreamServerStart()
-			log.With(nil).Infof("CRI Stream server stopped")
-		}()
-		streamRouterCh <- nil
+	// export this router for pouch server to register it.
+	if daemonConfig.CriConfig.StreamServerReusePort {
+		streamRouter = criMgr.StreamRouter()
 	}
 
-	go func() {
-		errChan <- service.Serve()
-		log.With(nil).Infof("CRI GRPC server stopped")
-	}()
-
-	// the criservice has set up, send Ready
-	readyCh <- true
-
-	// Check for error
-	for i := 0; i < cap(errChan); i++ {
-		if err := <-errChan; err != nil {
-			return err
-		}
-	}
-
-	log.With(nil).Infof("CRI service stopped")
-	return nil
+	return streamRouter, service, nil
 }

@@ -98,6 +98,8 @@ type CriMgr interface {
 	// StreamServerStart starts the stream server of CRI.
 	StreamServerStart() error
 
+	StreamServerShutdown() error
+
 	// StreamStart returns the router of Stream Server.
 	StreamRouter() stream.Router
 }
@@ -196,6 +198,11 @@ func NewCriManager(config *config.Config, ctrMgr mgr.ContainerMgr, imgMgr mgr.Im
 // StreamServerStart starts the stream server of CRI.
 func (c *CriManager) StreamServerStart() error {
 	return c.StreamServer.Start()
+}
+
+// StreamServerStart stop the stream server of CRI.
+func (c *CriManager) StreamServerShutdown() error {
+	return c.StreamServer.Shutdown()
 }
 
 // StreamRouter returns the router of Stream StreamServer.

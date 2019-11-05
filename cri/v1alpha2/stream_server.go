@@ -28,6 +28,8 @@ type StreamServer interface {
 
 	// Start starts the stream server.
 	Start() error
+	// Shutdown close the server socket.
+	Shutdown() error
 
 	// Router is the Stream Server's handlers which we should export.
 	stream.Router
@@ -75,6 +77,11 @@ func NewStreamServer(config stream.Config, runtime stream.Runtime) (StreamServer
 // Start starts the stream server.
 func (s *server) Start() error {
 	return s.server.ListenAndServe()
+}
+
+// Shutdown close the server socket.
+func (s *server) Shutdown() error {
+	return s.server.Close()
 }
 
 func (s *server) ServeExec(w http.ResponseWriter, r *http.Request) {

@@ -123,8 +123,9 @@ func (s *Server) Stop() error {
 
 	select {
 	case <-drain:
+		log.With(nil).Infof("HTTP server has shutdown")
 	case <-time.After(60 * time.Second):
-		log.With(nil).Errorf("stop pouch server after waited 60 seconds, on going request %d", atomic.LoadInt32(&s.FlyingReq))
+		log.With(nil).Errorf("stop HTTP server after waited 60 seconds, on going request %d", atomic.LoadInt32(&s.FlyingReq))
 	}
 
 	return nil

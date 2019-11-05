@@ -8,8 +8,7 @@ import (
 	"reflect"
 
 	"github.com/alibaba/pouch/apis/server"
-	criservice "github.com/alibaba/pouch/cri"
-	"github.com/alibaba/pouch/cri/stream"
+	"github.com/alibaba/pouch/cri"
 	"github.com/alibaba/pouch/ctrd"
 	"github.com/alibaba/pouch/ctrd/supervisord"
 	"github.com/alibaba/pouch/daemon/config"
@@ -24,6 +23,8 @@ import (
 
 	systemddaemon "github.com/coreos/go-systemd/daemon"
 	systemdutil "github.com/coreos/go-systemd/util"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // Daemon refers to a daemon.
@@ -42,6 +43,7 @@ type Daemon struct {
 	volumeMgr       mgr.VolumeMgr
 	networkMgr      mgr.NetworkMgr
 	server          server.Server
+	criServer       cri.CRIService
 	containerPlugin hookplugins.ContainerPlugin
 	imagePlugin     hookplugins.ImagePlugin
 	daemonPlugin    hookplugins.DaemonPlugin
@@ -242,14 +244,12 @@ func (d *Daemon) Run() error {
 	// set image proxy
 	ctrd.SetImageProxy(d.config.ImageProxy)
 
-	criStreamRouterCh := make(chan stream.Router)
-	criReadyCh := make(chan bool)
-	criStopCh := make(chan error)
+	criStreamRouter, criServer, err := cri.NewCriService(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin)
+	if err != nil {
+		return err
+	}
 
-	go criservice.RunCriService(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin, criStreamRouterCh, criStopCh, criReadyCh)
-
-	streamRouter := <-criStreamRouterCh
-
+	d.criServer = criServer
 	d.server = server.Server{
 		Config:          d.config,
 		ContainerMgr:    containerMgr,
@@ -257,58 +257,72 @@ func (d *Daemon) Run() error {
 		ImageMgr:        imageMgr,
 		VolumeMgr:       volumeMgr,
 		NetworkMgr:      networkMgr,
-		StreamRouter:    streamRouter,
+		StreamRouter:    criStreamRouter,
 		ContainerPlugin: d.containerPlugin,
 		APIPlugin:       d.apiPlugin,
 	}
 
-	httpReadyCh := make(chan bool)
-	httpCloseCh := make(chan struct{})
+	var (
+		httpReadyCh = make(chan bool)
+		httpReady   = false
+		criReady    = false
+		errCh       = make(chan error)
+	)
+
 	go func() {
 		if err := d.server.Start(httpReadyCh); err != nil {
-			log.With(nil).Errorf("failed to start http server: %v", err)
+			errCh <- errors.Wrapf(err, "failed to start http server")
 		}
-		close(httpCloseCh)
 	}()
+	httpReady = <-httpReadyCh
+	close(httpReadyCh)
 
-	httpReady := <-httpReadyCh
-	criReady := <-criReadyCh
+	if httpReady && d.criServer != nil {
+		criReadyCh := make(chan bool)
+		go func() {
+			log.With(nil).Infof("Start CRI service with CRI version: %s", d.config.CriConfig.CriVersion)
+			if err := d.criServer.Start(criReadyCh); err != nil {
+				errCh <- errors.Wrapf(err, "failed to start cri server")
+			}
+		}()
+		criReady = <-criReadyCh
+		close(criReadyCh)
+	}
 
 	if httpReady && criReady {
 		notifySystemd()
 	}
 
-	// close the ready channel
-	close(httpReadyCh)
-	close(criReadyCh)
-
-	err = <-criStopCh
-	if err != nil {
-		return err
-	}
-
-	// Stop pouchd if the server stopped
-	<-httpCloseCh
-	log.With(nil).Infof("HTTP server stopped")
-
-	return nil
+	return <-errCh
 }
 
 // Shutdown stops daemon.
 func (d *Daemon) Shutdown() error {
-	var errMsg string
+	var group errgroup.Group
 
-	if err := d.server.Stop(); err != nil {
-		errMsg = fmt.Sprintf("%s\n", err.Error())
+	group.Go(func() error {
+		return d.server.Stop()
+	})
+	if d.criServer != nil {
+		group.Go(func() error {
+			return d.criServer.Shutdown()
+		})
+	}
+
+	// we must promise containerd are working when gracefully shutdown server,
+	// then do containerd cleanup.
+	var errMsg string
+	if err := group.Wait(); err != nil {
+		errMsg += fmt.Sprintf("%s\n", err.Error())
 	}
 
 	log.With(nil).Debugf("Start cleanup containerd...")
 	if err := d.ctrdClient.Cleanup(); err != nil {
-		errMsg = fmt.Sprintf("%s\n", err.Error())
+		errMsg += fmt.Sprintf("%s\n", err.Error())
 	}
 
 	if err := d.ctrdDaemon.Stop(); err != nil {
-		errMsg = fmt.Sprintf("%s\n", err.Error())
+		errMsg += fmt.Sprintf("%s\n", err.Error())
 	}
 
 	if errMsg != "" {
