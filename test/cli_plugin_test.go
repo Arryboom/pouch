@@ -283,10 +283,13 @@ func (suite *PouchPluginSuite) TestSetHostnameEnv(c *check.C) {
 
 	expectedstring := "HOSTNAME=\"myhello\""
 	cmd := "cat /etc/profile.d/pouchenv.sh"
-	out := command.PouchRun("exec", name, "bash", "-c", cmd).Stdout()
-	if !strings.Contains(out, expectedstring) {
-		c.Errorf("%s should contains %s", out, expectedstring)
-	}
+	res = command.PouchRun("exec", name, "bash", "-c", cmd)
+	res.Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(res.Stdout(), expectedstring), check.IsNil)
+
+	res = command.PouchRun("exec", name, "hostname")
+	res.Assert(c, icmd.Success)
+	c.Assert(util.PartialEqual(res.Stdout(), "myhello"), check.IsNil)
 }
 
 // TestTrimPrefixContainerSlash: if VolumesFrom specified and the container name has a prefix of slash, trim it
