@@ -514,6 +514,9 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 		if !errtypes.IsTimeout(err) {
 			return nil, err
 		}
+		if err := c.forceDestroyContainer(ctx, pack.id); err != nil {
+			log.With(ctx).Warnf("failed to force destroy container when kill error: %s", err)
+		}
 		log.With(ctx).Warnf("timeout to kill task, err(%v)", err)
 	}
 

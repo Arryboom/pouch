@@ -980,7 +980,7 @@ func (mgr *ContainerManager) Stop(ctx context.Context, name string, timeout int6
 	return nil
 }
 
-func (mgr *ContainerManager) stop(ctx context.Context, c *Container, timeout int64) error {
+func (mgr *ContainerManager) stop(ctx context.Context, c *Container, timeout int64) (err error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -992,6 +992,16 @@ func (mgr *ContainerManager) stop(ctx context.Context, c *Container, timeout int
 	if timeout == 0 {
 		timeout = c.StopTimeout()
 	}
+
+	defer func() {
+		// if runtime is kata-runtime and container created with cri,
+		// add service unavailable
+		if err != nil {
+			if c.HostConfig.RuntimeType == ctrd.RuntimeTypeV2kataV2 {
+				err = errors.Wrap(errtypes.ErrServiceUnavailable, err.Error())
+			}
+		}
+	}()
 
 	id := c.ID
 	msg, err := mgr.Client.DestroyContainer(ctx, id, timeout)

@@ -495,8 +495,8 @@ func (c *CriManager) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 	for _, container := range containers {
 		err = c.ContainerMgr.Stop(ctx, container.ID, defaultStopTimeout)
 		if err != nil {
-			if errtypes.IsNotfound(err) {
-				log.With(ctx).Warningf("container %q of sandbox %q not found", container.ID, podSandboxID)
+			if errtypes.IsNotfound(err) || errtypes.IsServiceUnavailable(err) {
+				log.With(ctx).Warningf("container %q of sandbox %q not found or service unavailable error", container.ID, podSandboxID)
 				continue
 			}
 			return nil, fmt.Errorf("failed to stop container %q of sandbox %q: %v", container.ID, podSandboxID, err)

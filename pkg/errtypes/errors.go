@@ -40,6 +40,9 @@ var (
 
 	// ErrInvalidAuthorization represents that authorization failed.
 	ErrInvalidAuthorization = errorType{codeInvalidAuthorization, "authorization failed"}
+
+	// ErrServiceUnavailable represents thats service unavailable
+	ErrServiceUnavailable = errorType{codeServiceUnavailable, "service unavailable"}
 )
 
 const (
@@ -55,6 +58,7 @@ const (
 	codeNotModified
 	codePreCheckFailed
 	codeInvalidAuthorization
+	codeServiceUnavailable
 
 	// volume error code
 	codeVolumeExisted
@@ -109,6 +113,11 @@ func IsPreCheckFailed(err error) bool {
 // IsInvalidAuthorization checks the errors is authorization failure or not.
 func IsInvalidAuthorization(err error) bool {
 	return checkError(err, codeInvalidAuthorization)
+}
+
+// checks the errors is authorization failure or not.
+func IsServiceUnavailable(err error) bool {
+	return checkError(err, codeServiceUnavailable)
 }
 
 func checkError(err error, code int) bool {
