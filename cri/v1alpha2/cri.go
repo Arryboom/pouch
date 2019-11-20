@@ -571,7 +571,7 @@ func (c *CriManager) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	for _, container := range containers {
 		if err := c.ContainerMgr.Remove(ctx, container.ID, &apitypes.ContainerRemoveOptions{Volumes: true, Force: true}); err != nil {
 			if errtypes.IsNotfound(err) {
-				log.With(ctx).Warningf("container %q of sandbox %q not found: %v", container.ID, podSandboxID)
+				log.With(ctx).Warningf("container %q of sandbox %q not found: %v", container.ID, podSandboxID, err)
 				continue
 			}
 			return nil, fmt.Errorf("failed to remove container %q of sandbox %q: %v", container.ID, podSandboxID, err)

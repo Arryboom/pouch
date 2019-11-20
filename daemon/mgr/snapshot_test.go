@@ -43,7 +43,7 @@ func Test_SnapshotStore(t *testing.T) {
 
 	t.Logf("should be able to get snapshot")
 	for id, sn := range snapshots {
-		got, err := s.Get(id)
+		got, err := s.Get(id, false)
 		assert.NoError(t, err)
 		assert.Equal(t, sn, got)
 	}
@@ -60,7 +60,7 @@ func Test_SnapshotStore(t *testing.T) {
 	assert.Len(t, sns, 2)
 
 	t.Logf("get should return empty struct and ErrNotExist after deletion")
-	sn, err := s.Get(testKey)
+	sn, err := s.Get(testKey, false)
 	assert.Equal(t, Snapshot{}, sn)
 	assert.Equal(t, errtypes.IsNotfound(err), true)
 }
