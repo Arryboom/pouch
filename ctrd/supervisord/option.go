@@ -57,7 +57,7 @@ func WithSnapshotterConfig(s string, c interface{}) Opt {
 }
 
 // WithV1RuntimeShimType set v1 runtime config in containerd
-func WithV1RuntimeConfig(debug bool, shim string) Opt {
+func WithV1RuntimeConfig(shim string) Opt {
 	return func(d *Daemon) error {
 
 		if d.cfg.Plugins == nil {
@@ -66,9 +66,8 @@ func WithV1RuntimeConfig(debug bool, shim string) Opt {
 
 		v1RuntimeCfg := V1RuntimeConfig{}
 
-		if debug {
-			v1RuntimeCfg.ShimDebug = debug
-		}
+		// always enable debug option
+		v1RuntimeCfg.ShimDebug = true
 
 		if shim != "" {
 			v1RuntimeCfg.Shim = shim

@@ -74,7 +74,7 @@ func NewDaemon(cfg *config.Config) *Daemon {
 	ctrdDaemonOpts := []supervisord.Opt{
 		supervisord.WithOOMScore(cfg.OOMScoreAdjust),
 		supervisord.WithGRPCAddress(cfg.ContainerdAddr),
-		supervisord.WithV1RuntimeConfig(cfg.Debug, cfg.ShimType),
+		supervisord.WithV1RuntimeConfig(cfg.ShimType),
 	}
 
 	if cfg.ContainerdPath != "" {
