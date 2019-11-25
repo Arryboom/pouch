@@ -176,3 +176,26 @@ func checkSnapshotsDir(homeDir string, snapshotter string) ([]string, error) {
 
 	return names, nil
 }
+
+// TestSetMultiSnapshotterOptsFailedCases tests pouchd with set multi-snapshotter-opts with failed cases
+func (suite *PouchSnapshotterSuite) TestSetMultiSnapshotterOptsFailedCases(c *check.C) {
+	_, err := StartDefaultDaemon(map[string]interface{}{
+		"allow-multi-snapshotter": true,
+		"multi-snapshotter-opts": map[string]interface{}{
+			"overlayfs": map[string]string{
+				"test-param1": "test1",
+			},
+		},
+	})
+	c.Assert(err, check.NotNil)
+
+	_, err = StartDefaultDaemon(map[string]interface{}{
+		"allow-multi-snapshotter": false,
+		"multi-snapshotter-opts": map[string]interface{}{
+			"overlay1fs": map[string]string{
+				"test-param1": "test1",
+			},
+		},
+	})
+	c.Assert(err, check.NotNil)
+}

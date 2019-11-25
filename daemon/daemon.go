@@ -85,6 +85,28 @@ func NewDaemon(cfg *config.Config) *Daemon {
 		ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithSnapshotterConfig(cfg.Snapshotter, cfg.SnapshotterOpts))
 	}
 
+	if cfg.Snapshotter != "" {
+		ctrd.SetSnapshotterName(cfg.Snapshotter)
+	}
+
+	if cfg.MultiSnapshotterOpts != nil {
+		if !cfg.AllowMultiSnapshotter {
+			log.With(nil).Errorf("allow-multi-snapshotter not set while multi-snapshotter-opts should be not set too")
+			return nil
+		}
+
+		currentSnapshotter := ctrd.CurrentSnapshotterName(context.Background())
+
+		for snapshotter, opt := range cfg.MultiSnapshotterOpts {
+			if snapshotter == currentSnapshotter {
+				log.With(nil).Errorf("current snapshotter has been set to %s, multi-snapshotter-opts should not set again", currentSnapshotter)
+				return nil
+			}
+
+			ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithSnapshotterConfig(snapshotter, opt))
+		}
+	}
+
 	for plug, c := range cfg.ProxyPlugins {
 		ctrdDaemonOpts = append(ctrdDaemonOpts, supervisord.WithProxyPluginConfig(plug, c))
 	}
@@ -112,10 +134,6 @@ func NewDaemon(cfg *config.Config) *Daemon {
 	if err != nil {
 		log.With(nil).Errorf("failed to new containerd's client: %v", err)
 		return nil
-	}
-
-	if cfg.Snapshotter != "" {
-		ctrd.SetSnapshotterName(cfg.Snapshotter)
 	}
 
 	if err = ctrdClient.CheckSnapshotterValid(ctrd.CurrentSnapshotterName(context.TODO()), cfg.AllowMultiSnapshotter); err != nil {
