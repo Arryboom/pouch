@@ -115,7 +115,7 @@ func IsInvalidAuthorization(err error) bool {
 	return checkError(err, codeInvalidAuthorization)
 }
 
-// checks the errors is authorization failure or not.
+// IsServiceUnavailable checks the errors is unavailable service.
 func IsServiceUnavailable(err error) bool {
 	return checkError(err, codeServiceUnavailable)
 }

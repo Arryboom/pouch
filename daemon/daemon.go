@@ -43,7 +43,7 @@ type Daemon struct {
 	volumeMgr       mgr.VolumeMgr
 	networkMgr      mgr.NetworkMgr
 	server          server.Server
-	criServer       cri.CRIService
+	criServer       cri.Server
 	containerPlugin hookplugins.ContainerPlugin
 	imagePlugin     hookplugins.ImagePlugin
 	daemonPlugin    hookplugins.DaemonPlugin
@@ -244,7 +244,7 @@ func (d *Daemon) Run() error {
 	// set image proxy
 	ctrd.SetImageProxy(d.config.ImageProxy)
 
-	criStreamRouter, criServer, err := cri.NewCriService(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin)
+	criStreamRouter, criServer, err := cri.NewCriServer(d.config, d.containerMgr, d.imageMgr, d.volumeMgr, d.criPlugin)
 	if err != nil {
 		return err
 	}
@@ -263,9 +263,9 @@ func (d *Daemon) Run() error {
 	}
 
 	var (
+		httpReady   bool
+		criReady    bool
 		httpReadyCh = make(chan bool)
-		httpReady   = false
-		criReady    = false
 		errCh       = make(chan error)
 	)
 

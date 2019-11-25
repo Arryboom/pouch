@@ -10,16 +10,17 @@ import (
 	"github.com/alibaba/pouch/hookplugins"
 )
 
-type CRIService interface {
+// Server defines cri service interface.
+type Server interface {
 	// Start always return non-nil error.
 	Start(readyCh chan bool) error
 	// Shutdown close the server socket.
 	Shutdown() error
 }
 
-// RunCriService start cri service if pouchd is specified with --enable-cri.
+// NewCriServer start cri service if pouchd is specified with --enable-cri.
 // if stream.Router is not nil, pouch server should register this router.
-func NewCriService(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, CRIService, error) {
+func NewCriServer(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, Server, error) {
 	if !daemonconfig.IsCriEnabled {
 		return nil, nil, nil
 	}
@@ -32,7 +33,7 @@ func NewCriService(daemonconfig *config.Config, containerMgr mgr.ContainerMgr, i
 }
 
 // create CRI service with CRI version: v1alpha2
-func newCRIServiceV1alpha2(daemonConfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, CRIService, error) {
+func newCRIServiceV1alpha2(daemonConfig *config.Config, containerMgr mgr.ContainerMgr, imageMgr mgr.ImageMgr, volumeMgr mgr.VolumeMgr, criPlugin hookplugins.CriPlugin) (stream.Router, Server, error) {
 	criMgr, err := criv1alpha2.NewCriManager(daemonConfig, containerMgr, imageMgr, volumeMgr, criPlugin)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get CriManager with error: %v", err)

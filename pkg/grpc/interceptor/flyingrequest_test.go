@@ -2,11 +2,12 @@ package interceptor
 
 import (
 	"context"
+	"sync/atomic"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	context2 "golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"sync/atomic"
-	"testing"
 )
 
 func TestFlyingRequestCountInterceptor(t *testing.T) {
@@ -67,7 +68,7 @@ func testFlyingRequest(shouldCount bool, counter *int32, t *testing.T) {
 	}()
 
 	<-continueCh
-	var onFlying int32 = 0
+	var onFlying int32
 	if shouldCount {
 		onFlying = 1
 	}

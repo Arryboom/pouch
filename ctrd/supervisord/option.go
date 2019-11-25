@@ -56,7 +56,7 @@ func WithSnapshotterConfig(s string, c interface{}) Opt {
 	}
 }
 
-// WithV1RuntimeShimType set v1 runtime config in containerd
+// WithV1RuntimeConfig set v1 runtime config in containerd
 func WithV1RuntimeConfig(shim string) Opt {
 	return func(d *Daemon) error {
 

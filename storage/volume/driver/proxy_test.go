@@ -17,42 +17,42 @@ func TestRemoteDriverRequestError(t *testing.T) {
 	defer server.Close()
 
 	mux.HandleFunc(remoteVolumeCreateService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot create volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeRemoveService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot remove volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeMountService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot mount volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeUnmountService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot unmount volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumePathService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Unknown volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeListService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot list volumes"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeGetService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		fmt.Fprintln(w, `{"Err": "Cannot get volume"}`)
 	})
 
 	mux.HandleFunc(remoteVolumeCapabilitiesService, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
+		w.Header().Set("Accept", "application/vnd.docker.plugins.v1+json")
 		http.Error(w, "error", 500)
 	})
 

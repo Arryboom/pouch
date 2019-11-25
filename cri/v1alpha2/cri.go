@@ -200,7 +200,7 @@ func (c *CriManager) StreamServerStart() error {
 	return c.StreamServer.Start()
 }
 
-// StreamServerStart stop the stream server of CRI.
+// StreamServerShutdown stop the stream server of CRI.
 func (c *CriManager) StreamServerShutdown() error {
 	return c.StreamServer.Shutdown()
 }
