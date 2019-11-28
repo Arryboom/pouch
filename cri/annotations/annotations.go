@@ -45,6 +45,9 @@ const (
 	// image storage for container
 	SnapshotterExtendAnnotation = "io.alibaba.pouch.snapshotter"
 
+	// ImageSnapshotterExtendAnnotation is used for choose snapshotter in unpacking image
+	ImageSnapshotterExtendAnnotation = "io.alibaba.pouch.image.snapshotter"
+
 	// CNIBandwidthIngress is the desired incoming bandwidth rate limits in bps.
 	CNIBandwidthIngress = "kubernetes.io/ingress-bandwidth"
 

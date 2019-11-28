@@ -367,6 +367,7 @@ func (c *CriManager) applySandboxAnnotations(sandboxMeta *metatypes.SandboxMeta,
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -411,6 +412,11 @@ func makeSandboxPouchConfig(config *runtime.PodSandboxConfig, sandboxMeta *metat
 	}
 	// Apply resource options.
 	hc.CgroupParent = config.GetLinux().GetCgroupParent()
+
+	// Apply sandbox container snapshotter
+	if snapshotter, ok := config.GetAnnotations()[anno.SnapshotterExtendAnnotation]; ok {
+		createConfig.Snapshotter = snapshotter
+	}
 
 	return createConfig, nil
 }
@@ -899,6 +905,11 @@ func (c *CriManager) updateCreateConfig(createConfig *apitypes.ContainerCreateCo
 
 	// Apply cgroupsParent derived from the sandbox config.
 	createConfig.HostConfig.CgroupParent = sandboxConfig.GetLinux().GetCgroupParent()
+
+	// Apply container snapshotter through sandbox config annotations
+	if snapshotter, ok := sandboxConfig.Annotations[anno.SnapshotterExtendAnnotation]; ok {
+		createConfig.Snapshotter = snapshotter
+	}
 
 	return nil
 }

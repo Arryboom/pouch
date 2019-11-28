@@ -1456,6 +1456,12 @@ func (c *CriManager) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		authConfig.RegistryToken = auth.GetRegistryToken()
 	}
 
+	// modify snapshotter through context label
+	annotations := r.SandboxConfig.GetAnnotations()
+	if snapshotter, ok := annotations[anno.ImageSnapshotterExtendAnnotation]; ok {
+		ctx = ctrd.WithSnapshotter(ctx, snapshotter)
+	}
+
 	if err := c.ImageMgr.PullImage(ctx, imageRef, authConfig, bytes.NewBuffer([]byte{})); err != nil {
 		return nil, err
 	}
