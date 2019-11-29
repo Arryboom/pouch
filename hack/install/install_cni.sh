@@ -30,6 +30,7 @@ cni::install_cni() {
   cd "${workdir}"
   git fetch --all
   git checkout "${CNI_VERSION}"
+  git pull origin ${CNI_VERSION}
 
   # build and copy into /opt/cni/bin
   "${workdir}"/build.sh
