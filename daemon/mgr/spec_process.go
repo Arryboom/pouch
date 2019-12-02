@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -116,6 +117,8 @@ func setupUser(ctx context.Context, c *Container, s *specs.Spec) (err error) {
 	if passwdPath == "" || groupPath == "" {
 		target, _ := ioutil.TempDir("", "pouch-user")
 		if em := tmpMount(target); em == nil {
+			// FIXME: block rootfs can not reset /etc/mtab through prestart hook, since host can not access container rootfs. revert this ops after pouch refactor
+			resetMtabFile(filepath.Join(c.MountFS, "/etc/mtab"), filepath.Join(target, "/etc/mtab"))
 			defer tmpUmount(target)
 			passwdPath = c.GetSpecificBasePath(target, user.PasswdFile)
 			groupPath = c.GetSpecificBasePath(target, user.GroupFile)
@@ -181,4 +184,15 @@ func setupNvidiaEnv(ctx context.Context, c *Container, s *specs.Spec) error {
 	s.Process.Env = append(s.Process.Env, fmt.Sprintf("NVIDIA_DRIVER_CAPABILITIES=%s", n.NvidiaDriverCapabilities))
 	s.Process.Env = append(s.Process.Env, fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", n.NvidiaVisibleDevices))
 	return nil
+}
+
+func resetMtabFile(source, dest string) {
+	data, err := ioutil.ReadFile(source)
+	if err != nil {
+		log.With(nil).Warnf("failed to read %s to reset mtab: %s", source, err)
+		return
+	}
+	if err = ioutil.WriteFile(dest, data, 0644); err != nil {
+		log.With(nil).Warnf("failed to reset matb %s: %s", dest, err)
+	}
 }
