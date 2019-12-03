@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/daemon/config"
@@ -203,22 +204,20 @@ func (udc *DaemonUpdateCommand) updateDaemonConfigFile() error {
 		daemonConfig.Snapshotter = udc.snapshotter
 	}
 
-	// write config to file
-	fd, err := os.OpenFile(udc.configFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := ioutil.TempFile(filepath.Dir(udc.configFile), ".tmp-"+filepath.Base(udc.configFile))
 	if err != nil {
-		return errors.Wrapf(err, "failed to open config file(%s)", udc.configFile)
+		return errors.Wrapf(err, "failed to create temp file")
 	}
-	defer fd.Close()
+	defer f.Close()
 
-	fd.Seek(0, io.SeekStart)
-	encoder := json.NewEncoder(fd)
+	encoder := json.NewEncoder(f)
 	encoder.SetIndent("", "    ")
 	err = encoder.Encode(daemonConfig)
 	if err != nil {
 		return errors.Wrapf(err, "failed to write config to file(%s)", udc.configFile)
 	}
 
-	return nil
+	return os.Rename(f.Name(), udc.configFile)
 }
 
 // daemonUpdateExample shows examples in updatedaemon command, and is used in auto-generated cli docs.

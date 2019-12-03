@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -35,6 +36,7 @@ type PouchDaemonSuite struct{}
 
 func init() {
 	check.Suite(&PouchDaemonSuite{})
+	os.Remove(daemon.ConfigFile)
 	os.RemoveAll(daemon.HomeDir)
 }
 
@@ -45,6 +47,7 @@ func (suite *PouchDaemonSuite) SetUpTest(c *check.C) {
 
 func (suite *PouchDaemonSuite) TearDownTest(c *check.C) {
 	os.Remove(daemon.ConfigFile)
+	os.RemoveAll(daemon.HomeDir)
 }
 
 // TestDaemonCgroupParent tests daemon with cgroup parent
@@ -430,6 +433,30 @@ func (suite *PouchDaemonSuite) TestUpdateDaemonOffline(c *check.C) {
 
 	ret := RunWithSpecifiedDaemon(dcfg, "info")
 	ret.Assert(c, icmd.Success)
+}
+
+// TestUpdateDaemonConcurrent concurrently update daemon
+func (suite *PouchDaemonSuite) TestUpdateDaemonConcurrent(c *check.C) {
+	dcfg, err := StartDefaultDaemon(nil)
+
+	c.Assert(err, check.IsNil)
+	defer dcfg.KillDaemon()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			RunWithSpecifiedDaemon(dcfg, "updatedaemon", "--offline=true", "--image-proxy", "http://127.0.0.1:8080", "--config-file", daemon.ConfigFile).Assert(c, icmd.Success)
+		}()
+	}
+	wg.Wait()
+
+	bytes, err := ioutil.ReadFile(daemon.ConfigFile)
+	c.Assert(err, check.IsNil)
+
+	configUpdated := strings.Contains(string(bytes), "http://127.0.0.1:8080")
+	c.Assert(configUpdated, check.Equals, true)
 }
 
 func ensureContainerNotExist(dcfg *daemon.Config, cname string) error {
