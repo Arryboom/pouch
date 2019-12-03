@@ -55,7 +55,7 @@ func (uc *UpdateCommand) addFlags() {
 	flagSet.StringSliceVarP(&uc.labels, "label", "l", nil, "Update labels for container")
 	flagSet.StringVar(&uc.restartPolicy, "restart", "", "Restart policy to apply when container exits")
 	flagSet.StringSliceVar(&uc.diskQuota, "disk-quota", nil, "Update disk quota for container(/=10g)")
-	flagSet.StringSliceVar(&uc.specAnnotation, "annotation", nil, "Update annotation for runtime spec")
+	flagSet.StringArrayVar(&uc.specAnnotation, "annotation", nil, "Update annotation for runtime spec")
 
 	// fix quota
 	flagSet.Int64Var(&uc.fixQuotaContainer, "fix-quota-container", 0, "fix container quota, value = -1 or > 16777216, flush container quota id according to the passed quota id, or use origin quota")
