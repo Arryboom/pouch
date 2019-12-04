@@ -2,6 +2,7 @@ package syslog
 
 import (
 	"net"
+	"time"
 
 	"github.com/RackSec/srslog"
 )
@@ -9,7 +10,8 @@ import (
 // localConn implements the serverConn interface, used to send syslog messages
 // to the remote syslog daemon.
 type remoteConn struct {
-	conn net.Conn
+	conn         net.Conn
+	writeTimeout time.Duration
 }
 
 // writeString will use Framer/Formatter to format the content before write.
@@ -25,6 +27,10 @@ func (n *remoteConn) writeString(framer Framer, formatter Formatter, p Priority,
 	}
 
 	formattedMessage := framer(formatter(p, hostname, tag, msg))
+
+	if err := n.conn.SetWriteDeadline(time.Now().Add(n.writeTimeout)); err != nil {
+		return err
+	}
 	_, err := n.conn.Write([]byte(formattedMessage))
 	return err
 }
@@ -36,10 +42,21 @@ func (n *remoteConn) close() error {
 	return n.conn.Close()
 }
 
+// updateWriteTimeout updates timeout for Write.
+func (n *remoteConn) updateWriteTimeout(d time.Duration) {
+	n.writeTimeout = d
+}
+
+// getWriteTimeout returns timeout for Write.
+func (n *remoteConn) getWriteTimeout() time.Duration {
+	return n.writeTimeout
+}
+
 // localConn implements the serverConn interface, used to send syslog messages
 // to the local syslog daemon over a Unix domain socket.
 type localConn struct {
-	conn net.Conn
+	conn         net.Conn
+	writeTimeout time.Duration
 }
 
 // writeString will use Framer/Formatter to format the content before write.
@@ -55,6 +72,10 @@ func (n *localConn) writeString(framer Framer, formatter Formatter, p Priority, 
 	}
 
 	formattedMessage := framer(formatter(p, hostname, tag, msg))
+
+	if err := n.conn.SetWriteDeadline(time.Now().Add(n.writeTimeout)); err != nil {
+		return err
+	}
 	_, err := n.conn.Write([]byte(formattedMessage))
 	return err
 }
@@ -64,4 +85,14 @@ func (n *localConn) writeString(framer Framer, formatter Formatter, p Priority, 
 // NOTE:close implements serverConn.close() methods.
 func (n *localConn) close() error {
 	return n.conn.Close()
+}
+
+// updateWriteTimeout updates timeout for Write.
+func (n *localConn) updateWriteTimeout(d time.Duration) {
+	n.writeTimeout = d
+}
+
+// getWriteTimeout returns timeout for Write.
+func (n *localConn) getWriteTimeout() time.Duration {
+	return n.writeTimeout
 }

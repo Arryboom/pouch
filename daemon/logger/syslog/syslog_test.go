@@ -94,6 +94,87 @@ func TestConnectUnixSocket(t *testing.T) {
 	checkUnixFormatterMessage(t, srslog.LOG_INFO|srslog.LOG_DAEMON, slog.opt.tag, msg, msgCh)
 }
 
+func TestDialerTimeout(t *testing.T) {
+	// FIXME(fuweid): add more cases for tcp and unix.
+	li := startListener("tcp+tls")
+	defer li.Close()
+
+	info := logger.Info{
+		LogConfig: map[string]string{
+			"syslog-address": "tcp+tls://" + li.Addr().String(),
+		},
+	}
+
+	slog, err := NewSyslog(info)
+	if err != nil {
+		t.Fatalf("failed to create Syslog for case: %v", err)
+	}
+
+	if _, err := slog.connect(); err == nil {
+		t.Fatalf("expected timeout error, but got nil")
+	} else if errT, ok := err.(interface {
+		Timeout() bool
+	}); !ok || !errT.Timeout() {
+		t.Fatalf("expected to get timeout error, but got %s", err)
+	}
+}
+
+func TestWriteDeadlineTimeout(t *testing.T) {
+	deferCloses := []io.Closer{}
+	defer func() {
+		for _, c := range deferCloses {
+			c.Close()
+		}
+	}()
+
+	for idx, proto := range []string{"tcp", "unix"} {
+		// msgCh is nil because there is no chance to send data to server
+		addr, li, _ := startStreamServer(proto, 2, nil)
+		deferCloses = append(deferCloses, li)
+
+		if proto != "" {
+			addr = proto + "://" + addr
+		}
+
+		info := logger.Info{
+			LogConfig: map[string]string{
+				"syslog-address": addr,
+			},
+		}
+
+		slog, err := NewSyslog(info)
+		if err != nil {
+			t.Fatalf("[case %v] failed to create Syslog for case: %v", idx, err)
+		}
+
+		if _, err := slog.connect(); err != nil {
+			t.Fatalf("[case %v] failed to connect: %v", idx, err)
+		}
+
+		var conn = slog.getConn()
+		var priority = defaultSyslogPriority | (srslog.LOG_INFO & severityMask)
+		var msg = "should be timeout"
+
+		if got := conn.(interface {
+			getWriteTimeout() time.Duration
+		}).getWriteTimeout(); got != writeTimeoutSec {
+			t.Fatalf("[case %v] default writeTimeoutSec should be %v, but got %v", idx, writeTimeoutSec, got)
+		}
+
+		conn.updateWriteTimeout(1 * time.Nanosecond)
+		_, err = slog.write(conn, priority, msg)
+		if err == nil {
+			t.Fatalf("[case %v] expected to get timeout error, but got nil", idx)
+		}
+
+		if errT, ok := err.(interface {
+			Timeout() bool
+		}); !ok || !errT.Timeout() {
+			t.Fatalf("[case %v] expected to get timeout error, but got %s", idx, err)
+		}
+	}
+}
+
 func TestLazyAndRetryConnect(t *testing.T) {
 	msgCh := make(chan string)
 
@@ -200,38 +281,9 @@ func startStreamServer(proto string, readTimeout int, msgCh chan<- string) (addr
 		log.Fatalf("not support %s", proto)
 	}
 
-	var (
-		li   net.Listener
-		err  error
-		cert tls.Certificate
-	)
-
-	// 127.0.0.1:0 will use random available port
-	addr = "127.0.0.1:0"
-	if proto == "unix" {
-		addr = randomUnixSocketName()
-	}
-
-	if proto == "tcp+tls" {
-		cert, err = tls.LoadX509KeyPair("test/ca.pem", "test/ca-key.pem")
-		if err != nil {
-			log.Fatalf("failed to load TLS keypair: %v", err)
-		}
-
-		config := tls.Config{Certificates: []tls.Certificate{cert}}
-		li, err = tls.Listen("tcp", addr, &config)
-		if err != nil {
-			log.Fatalf("failed to listen on %s: %v", addr, err)
-		}
-	} else {
-		li, err = net.Listen(proto, addr)
-		if err != nil {
-			log.Fatalf("failed to listen on %s: %v", addr, err)
-		}
-	}
-
-	addr = li.Addr().String()
+	li := startListener(proto)
 	conn = li
+	addr = li.Addr().String()
 	drainWg = new(sync.WaitGroup)
 
 	go func() {
@@ -262,6 +314,39 @@ func startStreamServer(proto string, readTimeout int, msgCh chan<- string) (addr
 		}
 	}()
 	return
+}
+
+// startListener starts random listener.
+func startListener(proto string) net.Listener {
+	var li net.Listener
+	var err error
+	var cert tls.Certificate
+
+	// 127.0.0.1:0 will use random available port
+	var addr = "127.0.0.1:0"
+
+	if proto == "unix" {
+		addr = randomUnixSocketName()
+	}
+
+	if proto == "tcp+tls" {
+		cert, err = tls.LoadX509KeyPair("test/ca.pem", "test/ca-key.pem")
+		if err != nil {
+			log.Fatalf("failed to load TLS keypair: %v", err)
+		}
+
+		config := tls.Config{Certificates: []tls.Certificate{cert}}
+		li, err = tls.Listen("tcp", addr, &config)
+		if err != nil {
+			log.Fatalf("failed to listen on %s: %v", addr, err)
+		}
+	} else {
+		li, err = net.Listen(proto, addr)
+		if err != nil {
+			log.Fatalf("failed to listen on %s: %v", addr, err)
+		}
+	}
+	return li
 }
 
 // randomUnixSocketName uses TempFile to create random file name.

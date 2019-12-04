@@ -2,6 +2,7 @@ package syslog
 
 import (
 	"crypto/tls"
+	"time"
 
 	"github.com/RackSec/srslog"
 )
@@ -18,6 +19,12 @@ type Formatter = srslog.Formatter
 const (
 	severityMask = 0x07
 	facilityMask = 0xf8
+
+	// writeTimeoutSec is timeout for conn.Write.
+	writeTimeoutSec = 3 * time.Second
+
+	// dailTimeoutSec is timeout for dail timeout
+	dailTimeoutSec = 3 * time.Second
 )
 
 var (

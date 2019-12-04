@@ -4,10 +4,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"time"
 )
 
 type serverConn interface {
 	writeString(framer Framer, formatter Formatter, p Priority, hostname, tag, s string) error
+	updateWriteTimeout(time.Duration)
 	close() error
 }
 
@@ -29,9 +31,12 @@ func commonDialer(network string, addr string) (serverConn, string, error) {
 		hostname string
 	)
 
-	c, err := net.Dial(network, addr)
+	c, err := net.DialTimeout(network, addr, dailTimeoutSec*time.Second)
 	if err == nil {
-		sc = &remoteConn{conn: c}
+		sc = &remoteConn{
+			conn:         c,
+			writeTimeout: writeTimeoutSec,
+		}
 		hostname = c.LocalAddr().String()
 	}
 	return sc, hostname, err
@@ -44,9 +49,16 @@ func tlsDialer(addr string, cfg *tls.Config) (serverConn, string, error) {
 		hostname string
 	)
 
-	c, err := tls.Dial("tcp", addr, cfg)
+	dailer := &net.Dialer{
+		Timeout: dailTimeoutSec,
+	}
+
+	c, err := tls.DialWithDialer(dailer, "tcp", addr, cfg)
 	if err == nil {
-		sc = &remoteConn{conn: c}
+		sc = &remoteConn{
+			conn:         c,
+			writeTimeout: writeTimeoutSec,
+		}
 		hostname = c.LocalAddr().String()
 	}
 	return sc, hostname, err
@@ -57,9 +69,12 @@ func tlsDialer(addr string, cfg *tls.Config) (serverConn, string, error) {
 func unixLocalDialer() (serverConn, string, error) {
 	for _, network := range unixDialerTypes {
 		for _, path := range unixDialerLocalPaths {
-			conn, err := net.Dial(network, path)
+			conn, err := net.DialTimeout(network, path, dailTimeoutSec*time.Second)
 			if err == nil {
-				return &localConn{conn: conn}, "localhost", nil
+				return &localConn{
+					conn:         conn,
+					writeTimeout: writeTimeoutSec,
+				}, "localhost", nil
 			}
 		}
 	}
