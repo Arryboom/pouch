@@ -772,7 +772,7 @@ func (mgr *ContainerManager) initContainerStorage(ctx context.Context, c *Contai
 	// prepare quota map
 	qms, err := mgr.prepareQuotaMap(ctx, c, mounted)
 	if err != nil {
-		return errors.Wrap(err, "failed to prepare quota maps")
+		log.With(ctx).Warnf("failed to prepare quota map: %v", err)
 	}
 
 	// populate the volumes
