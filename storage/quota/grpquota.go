@@ -285,6 +285,9 @@ func (quota *GrpQuotaDriver) GetNextQuotaID() (uint32, error) {
 			break
 		}
 	}
+	if id > QuotaMaxID {
+		return 0, errors.Errorf("reach the maximum quota id(%d)", QuotaMaxID)
+	}
 	quota.quotaIDs[id] = struct{}{}
 	quota.lastID = id
 

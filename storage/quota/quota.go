@@ -21,9 +21,12 @@ import (
 )
 
 const (
-	// QuotaMinID represents the minimize quota id.
+	// QuotaMinID represents the minimum quota id.
 	// The value is unit32(2^24).
 	QuotaMinID = uint32(16777216)
+
+	// QuotaMaxID represents the maximum quota id.
+	QuotaMaxID = uint32(200000000)
 
 	// procMountFile represent the mounts file in proc virtual file system.
 	procMountFile = "/proc/mounts"
