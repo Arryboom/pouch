@@ -485,3 +485,21 @@ func adaptKataBlockfile(c *mgr.Container) error {
 
 	return nil
 }
+
+// isOdpsHook verify whether container is run odps hook
+func isOdpsHook(config types.ContainerConfig, hostConfig types.HostConfig) bool {
+	if hostConfig.Runtime != "kata-runtime" {
+		return false
+	}
+
+	if getEnv(config.Env, "UNDERLAY_CHECK") != "self" {
+		return false
+	}
+
+	// only adapt to alipay container
+	if getEnv(config.Env, "ali_run_mode") != "alipay_container" {
+		return false
+	}
+
+	return true
+}

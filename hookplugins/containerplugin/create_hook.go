@@ -323,6 +323,14 @@ func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.Containe
 		createConfig.SpecAnnotation["net-priority"] = strconv.FormatInt(createConfig.NetPriority, 10)
 	}
 
+	// if isOdpsHook set, run odps hook to set env
+	if isOdpsHook(createConfig.ContainerConfig, *createConfig.HostConfig) {
+		err := runOdpsHook(createConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
