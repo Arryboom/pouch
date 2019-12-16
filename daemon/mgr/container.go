@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/alibaba/pouch/apis/opts"
@@ -338,6 +339,11 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, config *ty
 	currentSnapshotter := ctrd.CurrentSnapshotterName(ctx)
 	config.Snapshotter = currentSnapshotter
 
+	// set container runtime, PreStart need runtime
+	if config.HostConfig.Runtime == "" {
+		config.HostConfig.Runtime = mgr.Config.DefaultRuntime
+	}
+
 	if mgr.containerPlugin != nil {
 		log.With(ctx).Infof("invoke container pre-create hook in plugin")
 		if ex := mgr.containerPlugin.PreCreate(ctx, config); ex != nil {
@@ -420,11 +426,6 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, config *ty
 	if config.Hostname.String() == "" {
 		// if hostname is empty, take the part of id as the hostname
 		config.Hostname = strfmt.Hostname(id[:12])
-	}
-
-	// set container runtime
-	if config.HostConfig.Runtime == "" {
-		config.HostConfig.Runtime = mgr.Config.DefaultRuntime
 	}
 
 	config.HostConfig.RuntimeType, err = mgr.getRuntimeType(config.HostConfig.Runtime)
@@ -721,6 +722,9 @@ func (mgr *ContainerManager) start(ctx context.Context, c *Container, options *t
 		return errors.Wrapf(err, "failed to set mount tab(%s)", c.ID)
 	}
 
+	// set shm path before create runtime oci spec
+	mgr.SetShmPath(c)
+
 	if err = mgr.createContainerdContainer(ctx, c, options.CheckpointDir, options.CheckpointID); err != nil {
 		return errors.Wrapf(err, "failed to create container(%s) on containerd", c.ID)
 	}
@@ -805,6 +809,15 @@ func (mgr *ContainerManager) buildNetworkRelatedPath(c *Container) error {
 
 	// write the hostname file, other files are filled by libnetwork.
 	return ioutil.WriteFile(c.HostnamePath, []byte(c.Config.Hostname+"\n"), 0644)
+}
+
+// SetShmPath set container shm path
+func (mgr *ContainerManager) SetShmPath(c *Container) {
+	// for kata-runtime, since container is running in the vm, /dev/shm should
+	// created by kata-agent in vm
+	if c.HostConfig.Runtime != "kata-runtime" {
+		c.ShmPath = path.Join(mgr.Store.Path(c.ID), "shm")
+	}
 }
 
 func (mgr *ContainerManager) createContainerdContainer(ctx context.Context, c *Container, checkpointDir, checkpointID string) error {
@@ -2058,6 +2071,8 @@ func (mgr *ContainerManager) execExitedAndRelease(id string, m *ctrd.Message) er
 
 func (mgr *ContainerManager) releaseContainerResources(ctx context.Context, c *Container) error {
 	mgr.resetContainerIOs(c.ID)
+	mgr.UmountIpcShmPath(ctx, c)
+
 	return mgr.releaseContainerNetwork(ctx, c)
 }
 
@@ -2193,4 +2208,21 @@ func (mgr *ContainerManager) generateContainerID(specificID string) (string, err
 	}
 
 	return mgr.generateID()
+}
+
+// UmountIpcShmPath cleanup container shm when container not running
+func (mgr *ContainerManager) UmountIpcShmPath(ctx context.Context, c *Container) {
+	ipcMode := c.HostConfig.IpcMode
+	if isContainer(ipcMode) || isHost(ipcMode) {
+		return
+	}
+
+	if !IsInMount(c, "/dev/shm") {
+		shmPath := c.ShmPath
+		if shmPath != "" {
+			if err := syscall.Unmount(shmPath, syscall.MNT_DETACH); err != nil {
+				log.With(ctx).WithError(err).Warnf("failed to umount shm path %s", shmPath)
+			}
+		}
+	}
 }

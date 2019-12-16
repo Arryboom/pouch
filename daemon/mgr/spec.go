@@ -42,7 +42,7 @@ func createSpec(ctx context.Context, c *Container, specWrapper *SpecWrapper) err
 	}
 
 	// create Spec.Mounts spec
-	if err := setupMounts(ctx, c, s); err != nil {
+	if err := setupMounts(ctx, c, specWrapper); err != nil {
 		return err
 	}
 

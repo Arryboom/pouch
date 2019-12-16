@@ -99,6 +99,9 @@ const (
 
 	// RuntimeDir is specified name keeps runtime path script.
 	RuntimeDir = "runtimes"
+
+	// DefaultSHMSize defines default shm size for container
+	DefaultSHMSize int64 = 67108864
 )
 
 // ContainerFilter defines a function to filter
@@ -286,6 +289,9 @@ type Container struct {
 
 	// SnapshotMounts
 	SnapshotMounts []mount.Mount
+
+	// ShmPath
+	ShmPath string
 }
 
 // Key returns container's id.

@@ -376,6 +376,7 @@ PouchRunSuite.TestRunWithEnv
 PouchRunSuite.TestRunWithEnvfile
 PouchRunSuite.TestRunWithExitCode
 PouchRunSuite.TestRunWithIPCMode
+PouchRunSuite.TestRunWithIPCContainerMode
 PouchRunSuite.TestRunWithMtab
 PouchRunSuite.TestRunWithRM
 PouchRunSuite.TestRunWithSeccomp

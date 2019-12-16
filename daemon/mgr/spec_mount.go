@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
+	"syscall"
 
 	"github.com/alibaba/pouch/apis/types"
 	"github.com/alibaba/pouch/pkg/log"
@@ -128,16 +128,49 @@ func mergeContainerMount(mounts []specs.Mount, c *Container, s *specs.Spec) ([]s
 }
 
 // setupMounts create mount spec.
-func setupMounts(ctx context.Context, c *Container, s *specs.Spec) error {
+func setupMounts(ctx context.Context, c *Container, specWrapper *SpecWrapper) error {
 	var (
 		mounts []specs.Mount
 		err    error
+		s      = specWrapper.s
 	)
 
 	// Override the default mounts which are duplicate with user defined ones.
 	mounts, err = overrideDefaultMount(mounts, c, s)
 	if err != nil {
 		return errors.Wrap(err, "failed to override default spec mounts")
+	}
+
+	if !IsInMount(c, "/dev/shm") {
+		// setup container shm mount
+		log.With(ctx).Infof("setup %s shm path", c.ID)
+		if err := setupIpcShmPath(ctx, c, specWrapper); err != nil {
+			return errors.Wrap(err, "failed to setup ipc shm path")
+		}
+
+		if c.ShmPath == "" {
+			// consider for compatible, if shared ipc container created before shm patch, shm path was empty, should should only occur in --ipc=container: case
+			log.With(ctx).Warnf("container %s shm path is empty, it was an old container or a kata container", c.ID)
+
+			shmSize := DefaultSHMSize
+			if c.HostConfig.ShmSize != nil && *c.HostConfig.ShmSize != 0 {
+				shmSize = *c.HostConfig.ShmSize
+			}
+
+			mounts = append(mounts, specs.Mount{
+				Source:      "shm",
+				Destination: "/dev/shm",
+				Type:        "tmpfs",
+				Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=" + strconv.FormatInt(shmSize, 10)},
+			})
+		} else {
+			mounts = append(mounts, specs.Mount{
+				Source:      c.ShmPath,
+				Destination: "/dev/shm",
+				Type:        "bind",
+				Options:     []string{"rbind", "rprivate"},
+			})
+		}
 	}
 
 	// user defined mount
@@ -148,16 +181,6 @@ func setupMounts(ctx context.Context, c *Container, s *specs.Spec) error {
 
 	// modify share memory size, and change rw mode for privileged mode.
 	for i := range mounts {
-		if mounts[i].Destination == "/dev/shm" && c.HostConfig.ShmSize != nil &&
-			*c.HostConfig.ShmSize != 0 {
-			for idx, v := range mounts[i].Options {
-				if strings.Contains(v, "size=") {
-					mounts[i].Options[idx] = fmt.Sprintf("size=%s",
-						strconv.FormatInt(*c.HostConfig.ShmSize, 10))
-				}
-			}
-		}
-
 		if c.HostConfig.Privileged {
 			// Clear readonly for /sys.
 			if mounts[i].Destination == "/sys" && !s.Root.Readonly {
@@ -253,4 +276,63 @@ func (m mounts) Swap(i, j int) {
 func sortMounts(m []specs.Mount) []specs.Mount {
 	sort.Stable(mounts(m))
 	return m
+}
+
+// setupIpcShmPath
+func setupIpcShmPath(ctx context.Context, c *Container, specWrapper *SpecWrapper) error {
+
+	ipcMode := c.HostConfig.IpcMode
+
+	if isContainer(ipcMode) {
+		pc, err := getIpcContainer(ctx, specWrapper.ctrMgr, connectedContainer(ipcMode))
+		if err != nil {
+			return fmt.Errorf("run a container with --ipc=container, can not find ipc container: %s", err)
+		}
+		// if container created without this patch, container shm path is empty
+		c.ShmPath = pc.ShmPath
+	} else if isHost(ipcMode) {
+		if _, err := os.Stat("/dev/shm"); err != nil {
+			return fmt.Errorf("run a container with --ipc=host, but /dev/shm is not mount in host")
+		}
+		c.ShmPath = "/dev/shm"
+	} else {
+		if !IsInMount(c, "/dev/shm") {
+			var shmSize int64
+			// ShmPath has been set in start container process
+			shmPath := c.ShmPath
+			if shmPath == "" {
+				// this should not be empty
+				return nil
+			}
+			if err := os.MkdirAll(shmPath, 0700); err != nil && !os.IsExist(err) {
+				return fmt.Errorf("failed to create shm path for %s: %s", c.ID, err)
+			}
+			if c.HostConfig.ShmSize != nil {
+				shmSize = *c.HostConfig.ShmSize
+			}
+
+			if shmSize == 0 {
+				shmSize = DefaultSHMSize
+			}
+
+			if err := syscall.Mount("shm", shmPath, "tmpfs", uintptr(syscall.MS_NOEXEC|syscall.MS_NOSUID|syscall.MS_NODEV), "mode=1777,size="+strconv.FormatInt(shmSize, 10)); err != nil {
+				return fmt.Errorf("failed to mount shm for container %s: %s", c.ID, err)
+
+			}
+		}
+
+	}
+
+	return nil
+}
+
+// IsInMount check if destPath has been a bind mount in container
+func IsInMount(c *Container, destPath string) bool {
+	for _, m := range c.Mounts {
+		if filepath.Clean(m.Destination) == filepath.Clean(destPath) {
+			return true
+		}
+	}
+
+	return false
 }

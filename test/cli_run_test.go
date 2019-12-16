@@ -148,7 +148,6 @@ func (suite *PouchRunSuite) TestRunRestartPolicyNone(c *check.C) {
 }
 
 // TestRunWithIPCMode is to verify --specific IPC mode when running a container.
-// TODO: test container ipc namespace mode.
 func (suite *PouchRunSuite) TestRunWithIPCMode(c *check.C) {
 	name := "test-run-with-ipc-mode"
 
@@ -157,6 +156,29 @@ func (suite *PouchRunSuite) TestRunWithIPCMode(c *check.C) {
 	defer DelContainerForceMultyTime(c, name)
 
 	res.Assert(c, icmd.Success)
+}
+
+// TestRunWithIPCMode is to verify --specific IPC container mode when running a container.
+func (suite *PouchRunSuite) TestRunWithIPCContainerMode(c *check.C) {
+	name1 := "test-run-with-ipc-c-mode"
+
+	command.PouchRun("run", "-d", "--name", name1,
+		busyboxImage, "sh", "-c", "echo -n test > /dev/shm/test && top").Assert(c, icmd.Success)
+	defer DelContainerForceMultyTime(c, name1)
+
+	containerID, err := inspectFilter(name1, ".ID")
+	c.Assert(err, check.IsNil)
+
+	// test ipc container should share /dev/shm
+	name2 := "test-run-ipc-shared-shm"
+	command.PouchRun("run", "-d", "--name", name2,
+		"--ipc", "container:"+containerID, busyboxImage, "top")
+	defer DelContainerForceMultyTime(c, name2)
+
+	res := command.PouchRun("exec", name2, "cat", "/dev/shm/test")
+	res.Assert(c, icmd.Success)
+
+	c.Assert(util.PartialEqual(res.Stdout(), "test"), check.IsNil)
 }
 
 // TestRunWithUTSMode is to verify --specific UTS mode when running a container.

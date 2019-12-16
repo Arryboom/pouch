@@ -62,12 +62,6 @@ func NewDefaultSpec() *specs.Spec {
 			Options:     []string{"nosuid", "noexec", "nodev"},
 		},
 		{
-			Destination: "/dev/shm",
-			Type:        "tmpfs",
-			Source:      "shm",
-			Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", "size=65536k"},
-		},
-		{
 			Destination: "/sys/fs/cgroup",
 			Type:        "cgroup",
 			Source:      "cgroup",

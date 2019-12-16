@@ -49,6 +49,7 @@ func init() {
 // 14. add net-priority into spec-annotations
 // 15. add annotations with prefix 'annotation.' into spec-annotations, for edas serverless
 // 16. convert label pouch.SupportCgroup to env pouchSupportCgroup. Runc will clear cgroup readonly with this env
+// 17. in odps kata mixed deploy, if runtime is kata-runtime, and ali_run_mode is thin/vm/alipay_container, shm size should be half of memory
 func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.ContainerCreateConfig) error {
 	log.With(ctx).Infof("pre create method called")
 
@@ -215,6 +216,16 @@ func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.Containe
 		//don't bind /etc/hosts /etc/hostname /etc/resolv.conf files into container
 		createConfig.DisableNetworkFiles = true
 
+		if (createConfig.HostConfig.ShmSize == nil || *createConfig.HostConfig.ShmSize == 0) &&
+			createConfig.HostConfig.Memory > 0 {
+			partOfMemSize := createConfig.HostConfig.Memory / 2
+			createConfig.HostConfig.ShmSize = &partOfMemSize
+		}
+	}
+
+	// in odps kata mixed deploy, if runtime is kata-runtime, and ali_run_mode is thin/alipay_container, shm size should be half of memory, since shm should created in vm instead of on host kernel
+	if createConfig.HostConfig.Runtime == "kata-runtime" &&
+		(getEnv(env, "ali_run_mode") == "thin" || getEnv(env, "ali_run_mode") == "alipay_container") {
 		if (createConfig.HostConfig.ShmSize == nil || *createConfig.HostConfig.ShmSize == 0) &&
 			createConfig.HostConfig.Memory > 0 {
 			partOfMemSize := createConfig.HostConfig.Memory / 2
