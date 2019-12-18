@@ -47,6 +47,13 @@ type DaemonUpdateCommand struct {
 
 	homeDir     string
 	snapshotter string
+
+	defaultLogType string
+	logEnv         string
+	syslogAddress  string
+	syslogFacility string
+	syslogFormat   string
+	logTag         string
 }
 
 // Init initialize updatedaemon command.
@@ -89,6 +96,12 @@ func (udc *DaemonUpdateCommand) addFlags() {
 	flagSet.StringVar(&udc.logMaxSize, "log-opt-max-size", "", "update daemon max-size configured in default-log-config.Config")
 	flagSet.StringVar(&udc.homeDir, "home-dir", "", "update daemon home dir")
 	flagSet.StringVar(&udc.snapshotter, "snapshotter", "", "update daemon snapshotter")
+	flagSet.StringVar(&udc.defaultLogType, "default-log-type", "", "update default log type")
+	flagSet.StringVar(&udc.logEnv, "log-env", "", "update log driver env")
+	flagSet.StringVar(&udc.syslogAddress, "syslog-address", "", "update syslog log driver address")
+	flagSet.StringVar(&udc.syslogFacility, "syslog-facility", "", "update syslog log driver facility")
+	flagSet.StringVar(&udc.syslogFormat, "syslog-format", "", "update syslog log driver format")
+	flagSet.StringVar(&udc.logTag, "log-tag", "", "update log driver tag")
 }
 
 // daemonUpdateRun is the entry of updatedaemon command.
@@ -202,6 +215,45 @@ func (udc *DaemonUpdateCommand) updateDaemonConfigFile() error {
 
 	if flagSet.Changed("snapshotter") {
 		daemonConfig.Snapshotter = udc.snapshotter
+	}
+
+	if flagSet.Changed("default-log-type") {
+		daemonConfig.DefaultLogConfig.LogDriver = udc.defaultLogType
+	}
+
+	if flagSet.Changed("log-env") {
+		if daemonConfig.DefaultLogConfig.LogOpts == nil {
+			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
+		}
+		daemonConfig.DefaultLogConfig.LogOpts["env"] = udc.logEnv
+	}
+
+	if flagSet.Changed("log-tag") {
+		if daemonConfig.DefaultLogConfig.LogOpts == nil {
+			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
+		}
+		daemonConfig.DefaultLogConfig.LogOpts["tag"] = udc.logTag
+	}
+
+	if flagSet.Changed("syslog-address") {
+		if daemonConfig.DefaultLogConfig.LogOpts == nil {
+			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
+		}
+		daemonConfig.DefaultLogConfig.LogOpts["syslog-address"] = udc.syslogAddress
+	}
+
+	if flagSet.Changed("syslog-facility") {
+		if daemonConfig.DefaultLogConfig.LogOpts == nil {
+			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
+		}
+		daemonConfig.DefaultLogConfig.LogOpts["syslog-facility"] = udc.syslogFacility
+	}
+
+	if flagSet.Changed("syslog-format") {
+		if daemonConfig.DefaultLogConfig.LogOpts == nil {
+			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
+		}
+		daemonConfig.DefaultLogConfig.LogOpts["syslog-format"] = udc.syslogFormat
 	}
 
 	f, err := ioutil.TempFile(filepath.Dir(udc.configFile), ".tmp-"+filepath.Base(udc.configFile))
