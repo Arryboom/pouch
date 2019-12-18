@@ -1737,3 +1737,12 @@ func (suite *PouchPluginSuite) TestSudoerFileExist(c *check.C) {
 	// check /etc/sudoers can restore through copy
 	command.PouchRun("exec", name, "sh", "-c", "ls /etc/sudoers").Assert(c, icmd.Success)
 }
+
+// TestModifySnapshotter tests modify snapshotter through annotations
+func (suite *PouchPluginSuite) TestModifySnapshotter(c *check.C) {
+	name := "TestModifySnapshotter"
+	res := command.PouchRun("create", "--env", "io.alibaba.pouch.snapshotter=test-snap", "--name", name, busyboxImage)
+	defer DelContainerForceMultyTime(c, name)
+
+	c.Assert(util.PartialEqual(res.Stderr(), "snapshotter not loaded: test-snap"), check.IsNil)
+}

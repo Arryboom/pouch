@@ -295,6 +295,7 @@ PouchPluginSuite.TestInitWithAdminUid
 PouchPluginSuite.TestWmarkRatioCanbeInherit
 PouchPluginSuite.TestStartHookLogExist
 PouchPluginSuite.TestSudoerFileExist
+PouchPluginSuite.TestModifySnapshotter
 PouchPsSuite.TestPsAll
 PouchPsSuite.TestPsFilterEqual
 PouchPsSuite.TestPsFilterInvalid

@@ -62,6 +62,7 @@ func init() {
 // 15. add annotations with prefix 'annotation.' into spec-annotations, for edas serverless
 // 16. convert label pouch.SupportCgroup to env pouchSupportCgroup. Runc will clear cgroup readonly with this env
 // 17. in odps kata mixed deploy, if runtime is kata-runtime, and ali_run_mode is thin/vm/alipay_container, shm size should be half of memory
+// 18. in odps kata mixed deploy, in hippo case, since hippo not use k8s, can not use cri to modify snapshotter, use --env to modify container snapshotter
 func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.ContainerCreateConfig) error {
 	log.With(ctx).Infof("pre create method called")
 
@@ -294,6 +295,14 @@ func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.Containe
 	if createConfig.HostConfig.Runtime == "runc" &&
 		createConfig.Snapshotter == "qcow2" {
 		createConfig.Snapshotter = "overlayfs"
+	}
+
+	// set snapshotter according to annotation
+	// NOTE: hippo mixed deploy with odps, hippo not use k8s, so can not set snapshotter
+	// through cri
+	snap := getEnv(env, SnapshotterExtendEnv)
+	if snap != "" {
+		createConfig.Snapshotter = snap
 	}
 
 	if createConfig.SpecAnnotation == nil {

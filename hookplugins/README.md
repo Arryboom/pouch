@@ -140,12 +140,18 @@ runc中会解析pouchSupportCgroup=true， 将容器cgroup的readonly mount opti
 支持alidocker和pouch。alidocker上该功能的代码提交如下：
 [label alipay.SupportCgroup=true](http://gitlab.alibaba-inc.com/docker/docker/commit/87bda17027515c0cf60993f9c7d454ecf2ec84cd)
 
-#### 13. 对odps场景下hook设置
+#### 13. 对odps场景下hook设置(2020-1.17前需要去掉)
 
 执行条件：runtime=kata-runtime && env UNDERLAY_CHECK=self && env ali_run_mode=alipay_container。
 这是针对蚂蚁跨vpc设置underlay路由的hook,详情见 <https://yuque.antfin-inc.com/docs/share/3684a853-ae4c-42b8-9a12-c11785b51dd2?#>。
 满足条件下会执行curl <http://100.100.100.200/latest/user-data>，得到一个脚本，脚本里面有underlay routes，通过解析会得到routes、ip、mac、gateway，
 将这些分别设置到env中，在针对kata的start_hook_vm.sh脚本中，会解析这些env，在容器启动后，将underlay路由设置到容器中。
+
+#### 14. odps搜索袋鼠混部场景，支持用env选择snapshotter
+
+袋鼠混部场景在离线混跑，在线runc配置不做修改，离线进kata容器，kata容器使用devmapper snapshotter，
+使用 --env io.alibaba.pouch.snapshotter=snap 支持容器自定义snapshotter。
+（注：搜索不使用k8s调度）
 
 ### 容器启动插件点：PreStart
 
