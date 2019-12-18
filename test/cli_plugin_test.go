@@ -1357,6 +1357,7 @@ func (suite *PouchPluginSuite) TestContainerWithEnableEnvHitList(c *check.C) {
 
 // TestEnvSN tests check env SN whether have been set into /dev/mem.
 func (suite *PouchPluginSuite) TestEnvSN(c *check.C) {
+	// test sn for normal container
 	cname := "TestEnvSN"
 	sn := "abcdefg"
 
@@ -1373,6 +1374,42 @@ func (suite *PouchPluginSuite) TestEnvSN(c *check.C) {
 	stdout := res.Stdout()
 	if !strings.Contains(stdout, sn) {
 		c.Fatalf("failed to get sn in container, got(%s), want(%s)", stdout, sn)
+	}
+
+	res = command.PouchRun("exec", cname, "cat", "/usr/bin/staragent_sn")
+	res.Assert(c, icmd.Success)
+
+	stdout = res.Stdout()
+	if !strings.Contains(stdout, sn) {
+		c.Fatalf("failed to get sn in container, got(%s), want(%s)", stdout, sn)
+	}
+
+	// test sn for rich container
+	cnameRich := "TestEnvSNRichContainer"
+	snRich := "rich-1234567"
+
+	command.PouchRun("run", "-d",
+		"--name", cnameRich,
+		"-e", "SN="+snRich,
+		"-e", "ali_run_mode=common_vm",
+		"-v", "/sbin/dmidecode:/tmp/dmidecode:ro",
+		alios7u, "sleep", "10000").Assert(c, icmd.Success)
+	defer DelContainerForceMultyTime(c, cname)
+
+	res = command.PouchRun("exec", cnameRich, "/tmp/dmidecode", "-s", "system-serial-number")
+	res.Assert(c, icmd.Success)
+
+	stdout = res.Stdout()
+	if !strings.Contains(stdout, snRich) {
+		c.Fatalf("failed to get sn in container, got(%s), want(%s)", stdout, snRich)
+	}
+
+	res = command.PouchRun("exec", cnameRich, "cat", "/usr/bin/staragent_sn")
+	res.Assert(c, icmd.Success)
+
+	stdout = res.Stdout()
+	if !strings.Contains(stdout, snRich) {
+		c.Fatalf("failed to get sn in container, got(%s), want(%s)", stdout, snRich)
 	}
 }
 
