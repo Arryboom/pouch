@@ -432,6 +432,12 @@ func (mgr *ContainerManager) Create(ctx context.Context, name string, createConf
 	// the same.
 	imgName := primaryRef.String()
 
+	// lock image prevent delete by RemoveImage api.
+	if !mgr.ImageMgr.TryLockImage(ctx, string(imgID)) {
+		return nil, fmt.Errorf("failed to get image lock, using by removing image")
+	}
+	defer mgr.ImageMgr.UnlockImage(ctx, string(imgID))
+
 	// TODO: check request validate.
 	if createConfig.HostConfig == nil {
 		return nil, errors.Wrapf(errtypes.ErrInvalidParam, "HostConfig cannot be empty")

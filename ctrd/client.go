@@ -42,7 +42,7 @@ var ErrGetCtrdClient = errors.New("failed to get a containerd grpc client")
 type Client struct {
 	mu    sync.RWMutex
 	watch *watch
-	lock  *containerLock
+	lock  *utils.MapLock
 
 	// insecureRegistries stores the insecure registries
 	insecureRegistries []string
@@ -81,9 +81,7 @@ func NewClient(opts ...ClientOpt) (APIClient, error) {
 	}
 
 	client := &Client{
-		lock: &containerLock{
-			ids: make(map[string]struct{}),
-		},
+		lock: utils.NewMapLock(),
 		watch: &watch{
 			containers: make(map[string]*containerPack),
 		},

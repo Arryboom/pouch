@@ -97,6 +97,12 @@ type ImageMgr interface {
 
 	// GetImagePrimaryRefAndName returns the primary reference and name, default returns repo digest and tag.
 	GetImagePrimaryRefAndName(ctx context.Context, image string) (string, string, error)
+
+	// TryLockImage locks image.
+	TryLockImage(ctx context.Context, image string) bool
+
+	// UnlockImage unlocks image.
+	UnlockImage(ctx context.Context, image string)
 }
 
 // ImageManager is an implementation of interface ImageMgr.
@@ -124,6 +130,9 @@ type ImageManager struct {
 
 	// imagePlugin is a plugin called before image operations
 	imagePlugin hookplugins.ImagePlugin
+
+	// locks manages all image locks
+	locks *utils.MapLock
 }
 
 // NewImageManager initializes a brand new image manager.
@@ -142,6 +151,7 @@ func NewImageManager(cfg *config.Config, client ctrd.APIClient, eventsService *e
 		localStore:    store,
 		eventsService: eventsService,
 		imagePlugin:   imagePlugin,
+		locks:         utils.NewMapLock(),
 	}
 
 	if err := mgr.updateLocalStore(); err != nil {
@@ -828,6 +838,16 @@ func (mgr *ImageManager) StoreImageReference(ctx context.Context, img containerd
 		OCISpec: ociImage,
 	})
 	return nil
+}
+
+// TryLockImage locks image.
+func (mgr *ImageManager) TryLockImage(ctx context.Context, id string) bool {
+	return mgr.locks.TrylockWithRetry(ctx, id)
+}
+
+// UnlockImage unlocks image.
+func (mgr *ImageManager) UnlockImage(ctx context.Context, id string) {
+	mgr.locks.Unlock(id)
 }
 
 func (mgr *ImageManager) addReferenceIntoStore(id digest.Digest, ref reference.Named, dig digest.Digest) error {

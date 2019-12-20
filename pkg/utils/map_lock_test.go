@@ -1,4 +1,4 @@
-package ctrd
+package utils
 
 import (
 	"context"
@@ -9,9 +9,7 @@ import (
 )
 
 func Test_containerLock_TrylockWithRetry(t *testing.T) {
-	l := &containerLock{
-		ids: make(map[string]struct{}),
-	}
+	l := NewMapLock()
 
 	// basically, if the releaseTimeout < the tryLockTimeout,
 	// TrylockWithTimeout will lock successfully. If not, it will fail.
@@ -50,9 +48,7 @@ func Test_containerLock_TrylockWithRetry(t *testing.T) {
 }
 
 func Test_containerLock_Trylock(t *testing.T) {
-	l := &containerLock{
-		ids: make(map[string]struct{}),
-	}
+	l := NewMapLock()
 
 	assert.Equal(t, len(l.ids), 0)
 
@@ -76,9 +72,7 @@ func Test_containerLock_Trylock(t *testing.T) {
 }
 
 func Test_containerLock_Unlock(t *testing.T) {
-	l := &containerLock{
-		ids: make(map[string]struct{}),
-	}
+	l := NewMapLock()
 
 	// unlock a non-existent element
 	l.Unlock("non-existent")

@@ -114,6 +114,11 @@ func (s *Server) removeImage(ctx context.Context, rw http.ResponseWriter, req *h
 		return err
 	}
 
+	if !s.ImageMgr.TryLockImage(ctx, image.ID) {
+		return fmt.Errorf("failed to get image lock, using by creating container")
+	}
+	defer s.ImageMgr.UnlockImage(ctx, image.ID)
+
 	refs, err := s.ImageMgr.ListReferences(ctx, digest.Digest(image.ID))
 	if err != nil {
 		return err

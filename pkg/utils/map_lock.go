@@ -1,4 +1,4 @@
-package ctrd
+package utils
 
 import (
 	"context"
@@ -7,13 +7,21 @@ import (
 	"time"
 )
 
-// containerLock use to make sure that only one operates the container at the same time.
-type containerLock struct {
+// MapLock use to make sure that only one operates the container at the same time.
+type MapLock struct {
 	mutex sync.Mutex
 	ids   map[string]struct{}
 }
 
-func (l *containerLock) Trylock(id string) bool {
+// NewMapLock returns map lock struct.
+func NewMapLock() *MapLock {
+	return &MapLock{
+		ids: make(map[string]struct{}),
+	}
+}
+
+// Trylock will try to get lock with id.
+func (l *MapLock) Trylock(id string) bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -25,13 +33,15 @@ func (l *containerLock) Trylock(id string) bool {
 	return false
 }
 
-func (l *containerLock) Unlock(id string) {
+// Unlock unlock.
+func (l *MapLock) Unlock(id string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	delete(l.ids, id)
 }
 
-func (l *containerLock) TrylockWithRetry(ctx context.Context, id string) bool {
+// TrylockWithRetry will try to get lock with timeout by id.
+func (l *MapLock) TrylockWithRetry(ctx context.Context, id string) bool {
 	var retry = 32
 
 	for {
