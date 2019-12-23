@@ -23,6 +23,18 @@ var extendCapabilities = []string{
 	"SYS_PACCT",
 	"NET_ADMIN",
 	"SYS_ADMIN",
+	"DAC_READ_SEARCH",
+	"LINUX_IMMUTABLE",
+	"NET_BROADCAST",
+	"IPC_LOCK",
+	"IPC_OWNER",
+	"SYS_NICE",
+	"SYS_TTY_CONFIG",
+	"LEASE",
+	"AUDIT_CONTROL",
+	"SYSLOG",
+	"WAKE_ALARM",
+	"BLOCK_SUSPEND",
 }
 
 type contPlugin struct{}
