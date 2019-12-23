@@ -54,6 +54,11 @@ type DaemonUpdateCommand struct {
 	syslogFacility string
 	syslogFormat   string
 	logTag         string
+
+	allowMultiSnapshotter bool
+	proxyPlugin           string
+	proxyPluginAddress    string
+	proxyPluginType       string
 }
 
 // Init initialize updatedaemon command.
@@ -102,6 +107,10 @@ func (udc *DaemonUpdateCommand) addFlags() {
 	flagSet.StringVar(&udc.syslogFacility, "syslog-facility", "", "update syslog log driver facility")
 	flagSet.StringVar(&udc.syslogFormat, "syslog-format", "", "update syslog log driver format")
 	flagSet.StringVar(&udc.logTag, "log-tag", "", "update log driver tag")
+	flagSet.BoolVar(&udc.allowMultiSnapshotter, "allow-multi-snapshotter", false, "update daemon allow-multi-snapshotter")
+	flagSet.StringVar(&udc.proxyPlugin, "proxy-plugin", "", "update daemon proxy-plugin")
+	flagSet.StringVar(&udc.proxyPluginAddress, "proxy-plugin-address", "", "update daemon proxy-plugin's address")
+	flagSet.StringVar(&udc.proxyPluginType, "proxy-plugin-type", "", "update daemon proxy-plugin's type")
 }
 
 // daemonUpdateRun is the entry of updatedaemon command.
@@ -254,6 +263,25 @@ func (udc *DaemonUpdateCommand) updateDaemonConfigFile() error {
 			daemonConfig.DefaultLogConfig.LogOpts = make(map[string]string)
 		}
 		daemonConfig.DefaultLogConfig.LogOpts["syslog-format"] = udc.syslogFormat
+	}
+
+	if flagSet.Changed("allow-multi-snapshotter") {
+		daemonConfig.AllowMultiSnapshotter = udc.allowMultiSnapshotter
+	}
+
+	if flagSet.Changed("proxy-plugin") {
+		if daemonConfig.ProxyPlugins == nil {
+			daemonConfig.ProxyPlugins = make(map[string]map[string]string)
+		}
+		if daemonConfig.ProxyPlugins[udc.proxyPlugin] == nil {
+			daemonConfig.ProxyPlugins[udc.proxyPlugin] = make(map[string]string)
+		}
+		if flagSet.Changed("proxy-plugin-address") {
+			daemonConfig.ProxyPlugins[udc.proxyPlugin]["address"] = udc.proxyPluginAddress
+		}
+		if flagSet.Changed("proxy-plugin-type") {
+			daemonConfig.ProxyPlugins[udc.proxyPlugin]["type"] = udc.proxyPluginType
+		}
 	}
 
 	f, err := ioutil.TempFile(filepath.Dir(udc.configFile), ".tmp-"+filepath.Base(udc.configFile))
