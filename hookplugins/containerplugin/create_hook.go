@@ -236,7 +236,7 @@ func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.Containe
 	}
 
 	// in odps kata mixed deploy, if runtime is kata-runtime, and ali_run_mode is thin/alipay_container, shm size should be half of memory, since shm should created in vm instead of on host kernel
-	if createConfig.HostConfig.Runtime == "kata-runtime" &&
+	if createConfig.HostConfig.Runtime == kataRuntimeClass &&
 		(getEnv(env, "ali_run_mode") == "thin" || getEnv(env, "ali_run_mode") == "alipay_container") {
 		if (createConfig.HostConfig.ShmSize == nil || *createConfig.HostConfig.ShmSize == 0) &&
 			createConfig.HostConfig.Memory > 0 {

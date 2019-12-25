@@ -16,6 +16,8 @@ const (
 	// env value: "raw.file:/home/t4;raw.file:/home/"
 	blockFileEnvKey     = "pouch_kata_blockfile_host_container_path"
 	blockFileTypeEnvKey = "pouch_kata_blockfile_fs_type"
+
+	kataRuntimeClass = "kata-runtime"
 )
 
 var (

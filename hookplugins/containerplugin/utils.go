@@ -433,7 +433,7 @@ func adaptKataBlockfile(c *mgr.Container) error {
 		fsType         string
 	)
 
-	if !(c.HostConfig.Runtime == "kata-runtime") {
+	if !(c.HostConfig.Runtime == kataRuntimeClass) {
 		return nil
 	}
 
@@ -488,7 +488,7 @@ func adaptKataBlockfile(c *mgr.Container) error {
 
 // isOdpsHook verify whether container is run odps hook
 func isOdpsHook(config types.ContainerConfig, hostConfig types.HostConfig) bool {
-	if hostConfig.Runtime != "kata-runtime" {
+	if hostConfig.Runtime != kataRuntimeClass {
 		return false
 	}
 
