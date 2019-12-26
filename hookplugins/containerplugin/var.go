@@ -18,6 +18,7 @@ const (
 	blockFileTypeEnvKey = "pouch_kata_blockfile_fs_type"
 
 	kataRuntimeClass = "kata-runtime"
+	noneStr          = "none"
 
 	// SnapshotterExtendEnv defines image storage for container
 	SnapshotterExtendEnv = "io.alibaba.pouch.snapshotter"

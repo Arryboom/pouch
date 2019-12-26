@@ -503,3 +503,29 @@ func isOdpsHook(config types.ContainerConfig, hostConfig types.HostConfig) bool 
 
 	return true
 }
+
+func createEnvForCopyPodHosts(config *types.ContainerConfig, hostConfig *types.HostConfig) error {
+	resolvConfPath := noneStr
+	hostsPath := noneStr
+
+	for _, bind := range hostConfig.Binds {
+		srcDst := strings.Split(bind, ":")
+		if len(srcDst) >= 2 {
+			if srcDst[1] == "/etc/resolv.conf" {
+				resolvConfPath = srcDst[0]
+			}
+
+			if srcDst[1] == "/etc/hosts" {
+				hostsPath = srcDst[0]
+			}
+		}
+	}
+
+	// if resolvConfPath set, add env to run CopyPodHosts in start_hook_vm.sh
+	if resolvConfPath != noneStr {
+		copyPodHostsArgs := []string{"/opt/ali-iaas/pouch/bin/prestart_hook_alipay", "CopyPodHosts", resolvConfPath, hostsPath, noneStr}
+		config.Env = append(config.Env, fmt.Sprintf("CopyPodHostsArgs=%s", strings.Join(copyPodHostsArgs, ",")))
+	}
+
+	return nil
+}

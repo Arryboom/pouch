@@ -340,6 +340,14 @@ func (c *contPlugin) PreCreate(ctx context.Context, createConfig *types.Containe
 		}
 	}
 
+	// if kata runtime and set CopyPodHosts, add env CopyPodHostsArgs to run hook
+	if isCopyPodHostsOn(&createConfig.ContainerConfig, createConfig.HostConfig) && createConfig.HostConfig.Runtime == kataRuntimeClass {
+		err := createEnvForCopyPodHosts(&createConfig.ContainerConfig, createConfig.HostConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
