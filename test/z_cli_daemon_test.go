@@ -720,3 +720,33 @@ func (suite *PouchDaemonSuite) TestSnashotterDiskUsageCollector(c *check.C) {
 	_, _, err = syncer.FetchActiveOverlaySnapshotDiskUsage(context.TODO(), cid)
 	c.Assert(errtypes.IsNotfound(err), check.Equals, true)
 }
+
+// TestUpdateDaemonProxyPlugin tests update daemon proxy plugins
+func (suite *PouchDaemonSuite) TestUpdateDaemonProxyPlugin(c *check.C) {
+	dcfg, err := StartDefaultDaemon(nil)
+
+	c.Assert(err, check.IsNil)
+	defer dcfg.KillDaemon()
+
+	RunWithSpecifiedDaemon(dcfg, "updatedaemon", "--config-file", daemon.ConfigFile, "--offline=true", "--allow-multi-snapshotter=true", "--proxy-plugin=test-plugin",
+		"--proxy-plugin-address=/run/test.sock", "--proxy-plugin-type=snapshot").Assert(c, icmd.Success)
+
+	ret := RunWithSpecifiedDaemon(dcfg, "info")
+	ret.Assert(c, icmd.Success)
+
+	f, err := os.Open(daemon.ConfigFile)
+	c.Assert(err, check.IsNil)
+	defer f.Close()
+
+	readConfig := config.Config{}
+
+	err = json.NewDecoder(f).Decode(&readConfig)
+	c.Assert(err, check.IsNil)
+
+	c.Assert(readConfig.AllowMultiSnapshotter, check.Equals, true)
+	c.Assert(readConfig.ProxyPlugins, check.NotNil)
+	pluginInfo, exist := readConfig.ProxyPlugins["test-plugin"]
+	c.Assert(exist, check.Equals, true)
+	c.Assert(pluginInfo["address"], check.Equals, "/run/test.sock")
+	c.Assert(pluginInfo["type"], check.Equals, "snapshot")
+}
