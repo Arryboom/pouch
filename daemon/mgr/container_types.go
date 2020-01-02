@@ -98,6 +98,9 @@ const (
 	// DefaultStopTimeout is the timeout (in seconds) for the syscall signal used to stop a container.
 	DefaultStopTimeout = 10
 
+	// DefaultRemoveTimeout is the timeout (in seconds) for removing container.
+	DefaultRemoveTimeout = 60
+
 	// RuntimeDir is specified name keeps runtime path script.
 	RuntimeDir = "runtimes"
 

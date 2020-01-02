@@ -282,6 +282,29 @@ func (mgr *ContainerManager) Restore(ctx context.Context) error {
 		if c.IsDead() {
 			log.With(ctx).Warnf("stop to load container because it is dead")
 
+			c.UnsetMergedDir()
+
+			if err := mgr.releaseContainerResources(ctx, c); err != nil {
+				log.With(ctx).Errorf("failed to release container resource for dead container, err(%v)", err)
+			}
+
+			if err := mgr.detachVolumes(ctx, c, true); err != nil {
+				log.With(ctx).Errorf("failed to detach volume: %v", err)
+			}
+
+			if err := mgr.Client.RemoveSnapshot(ctx, c.SnapshotKey()); err != nil {
+				// if the container is created by normal method, remove the
+				// snapshot when delete it.
+				log.With(ctx).Errorf("failed to remove snapshot of container %s: %v", c.ID, err)
+			}
+
+			// remove name
+			mgr.NameToID.Remove(c.Name)
+			// remove container cache
+			mgr.cache.Remove(c.ID)
+			// remove the container IO
+			mgr.IOs.Remove(c.ID)
+
 			// remove meta.json for container in local disk
 			if err := mgr.Store.Remove(id); err != nil {
 				log.With(ctx).Errorf("failed to remove container from meta store, err(%v)", err)
@@ -1436,10 +1459,11 @@ func (mgr *ContainerManager) Remove(ctx context.Context, name string, options *t
 	c.Lock()
 	defer c.Unlock()
 
-	if c.IsDead() {
-		log.With(ctx).Warnf("container has been deleted %s", c.ID)
-		return nil
-	}
+	// TODO: remove it later.
+	//if c.IsDead() {
+	//	log.With(ctx).Warnf("container has been deleted %s", c.ID)
+	//	return nil
+	//}
 
 	needStop := false
 	if c.IsRunningOrPaused() {
@@ -1461,11 +1485,11 @@ func (mgr *ContainerManager) Remove(ctx context.Context, name string, options *t
 
 	// if the container is running, force to stop it.
 	if needStop {
-		err := mgr.destroyContainer(ctx, c, c.StopTimeout())
-
+		err := mgr.destroyContainer(ctx, c, DefaultRemoveTimeout)
 		if err != nil && !errtypes.IsNotfound(err) {
 			return errors.Wrapf(err, "failed to destroy container %s when removing", c.ID)
 		}
+
 		// After stopping a running container, we should release container resource
 		c.UnsetMergedDir()
 		if err := mgr.releaseContainerResources(ctx, c); err != nil {
