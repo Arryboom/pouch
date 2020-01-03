@@ -145,6 +145,9 @@ type ContainerExecConfig struct {
 
 	// Exited means exec process exit or not
 	Exited bool
+
+	// Execute in detach mode
+	Detach bool `json:"Detach,omitempty"`
 }
 
 // AttachConfig wraps some infos of attaching.

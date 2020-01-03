@@ -44,6 +44,7 @@ func (mgr *ContainerManager) CreateExec(ctx context.Context, name string, config
 		ExecCreateConfig: *config,
 		ContainerID:      c.ID,
 		Env:              envs,
+		Detach:           config.Detach,
 	}
 
 	mgr.ExecProcesses.Put(execid, execConfig)

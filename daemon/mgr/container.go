@@ -2239,7 +2239,10 @@ func (mgr *ContainerManager) execProcessGC() {
 			if execConfig.WaitForClean {
 				cleaned++
 				mgr.ExecProcesses.Remove(id)
-			} else if execConfig.Exited && execConfig.Used {
+			} else if execConfig.Exited && (execConfig.Used || !execConfig.Detach) {
+				// NOTE: this will cause exec id leak in pouch, if use detach exec mode, and
+				// no one try to get exec config after execute exec process start, then Used
+				// will be false forever, cause exec id leak
 				execConfig.WaitForClean = true
 			}
 			execConfig.Unlock()
