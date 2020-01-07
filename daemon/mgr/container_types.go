@@ -606,6 +606,14 @@ func (c *Container) GetResourcePath(baseFS, path string) string {
 	return filepath.Join(baseFS, path)
 }
 
+// GetSnapshotter used to get value in Snapshotter.Data according to passwd key
+func (c *Container) GetSnapshotter(key string) string {
+	c.Lock()
+	defer c.Unlock()
+
+	return c.Snapshotter.Data[key]
+}
+
 // ContainerRestartPolicy represents the policy is used to manage container.
 type ContainerRestartPolicy types.RestartPolicy
 

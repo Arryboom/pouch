@@ -89,8 +89,7 @@ func (s *Server) getContainer(ctx context.Context, rw http.ResponseWriter, req *
 	}
 
 	hostRootPath := unknowHostRootPath
-	mergedDir, ok := c.Snapshotter.Data["MergedDir"]
-	if ok {
+	if mergedDir := c.GetSnapshotter("MergedDir"); mergedDir != "" {
 		hostRootPath = mergedDir
 	}
 
