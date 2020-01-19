@@ -32,7 +32,6 @@ import (
 	"github.com/alibaba/pouch/pkg/streams"
 	"github.com/alibaba/pouch/pkg/utils"
 	volumetypes "github.com/alibaba/pouch/storage/volume/types"
-
 	"github.com/containerd/cgroups"
 	containerdtypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/mount"
@@ -2236,6 +2235,8 @@ func (mgr *ContainerManager) execProcessGC() {
 			// them in next loop, so that we can ensure exec process can get
 			// correct exit code.
 			execConfig.Lock()
+			log.With(nil).Debugf("exec config info, Exited(%v), Used(%v), Detach(%v)",
+				execConfig.Exited, execConfig.Used, execConfig.Detach)
 			if execConfig.WaitForClean {
 				cleaned++
 				mgr.ExecProcesses.Remove(id)

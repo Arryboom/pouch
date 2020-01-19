@@ -94,6 +94,7 @@ func (mgr *ContainerManager) StartExec(ctx context.Context, execid string, cfg *
 	c.Lock()
 	if !c.IsRunning() {
 		c.Unlock()
+		execConfig.Unlock()
 		return errors.Errorf("container(%s) is not running", c.ID)
 	}
 

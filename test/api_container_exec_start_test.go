@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -270,4 +272,55 @@ func (suite *APIContainerExecStartSuite) TestContainerExecDetach(c *check.C) {
 
 	c.Assert(execInspect04.Running, check.Equals, false)
 	c.Assert(execInspect04.ExitCode, check.Equals, int64(0))
+}
+
+// TestStoppedContainerExecStart tests start exec process when container is stopped.
+func (suite *APIContainerExecStartSuite) TestStoppedContainerExecStart(c *check.C) {
+	cname := "TestStoppedContainerExecStart"
+
+	CreateBusyboxContainerOk(c, cname)
+	defer DelContainerForceMultyTime(c, cname)
+	StartContainerOk(c, cname)
+
+	// verify that we can obtain the exec process's exitCode = 1
+	obj := map[string]interface{}{
+		"Cmd": []string{"ls"},
+	}
+	body := request.WithJSONBody(obj)
+	resp, err := request.Post("/containers/"+cname+"/exec", body)
+	c.Assert(err, check.IsNil)
+	CheckRespStatus(c, resp, 201)
+
+	var execCreateResp types.ExecCreateResp
+	err = request.DecodeBody(&execCreateResp, resp.Body)
+	c.Assert(err, check.IsNil)
+
+	execid := execCreateResp.ID
+
+	// stop container
+	StopContainerOk(c, cname)
+
+	time.Sleep(1 * time.Second)
+
+	// start the exec
+	{
+		errCh := make(chan error, 1)
+		var resp *http.Response
+		go func() {
+			resp, err = request.Post("/exec/"+execid+"/start", request.WithJSONBody(map[string]interface{}{}))
+			errCh <- err
+		}()
+		select {
+		case err := <-errCh:
+			c.Assert(err, check.IsNil)
+			CheckRespStatus(c, resp, 200)
+			body, err := ioutil.ReadAll(resp.Body)
+			c.Assert(err, check.IsNil)
+			if !strings.Contains(string(body), "is not running") {
+				c.Fatalf("container(%s) is running...", cname)
+			}
+		case <-time.After(30 * time.Second):
+			c.Fatalf("run exec start timeout 10s")
+		}
+	}
 }
