@@ -299,6 +299,11 @@ func (d *Daemon) Run() error {
 	httpReady = <-httpReadyCh
 	close(httpReadyCh)
 
+	// has disabled cri gRPC server.
+	if d.criServer == nil {
+		criReady = true
+	}
+
 	if httpReady && d.criServer != nil {
 		criReadyCh := make(chan bool)
 		go func() {
