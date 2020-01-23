@@ -69,6 +69,10 @@ func isChannelClosed(s containerd.ExitStatus) bool {
 	rpcError := strings.Contains(s.Error().Error(), "transport is closing") ||
 		strings.Contains(s.Error().Error(), "rpc error")
 
+	if strings.Contains(s.Error().Error(), "client shutting down") {
+		rpcError = false
+	}
+
 	return s.ExitTime().IsZero() && rpcError
 }
 
