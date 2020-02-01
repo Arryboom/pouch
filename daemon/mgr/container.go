@@ -2287,7 +2287,9 @@ func (mgr *ContainerManager) UmountIpcShmPath(ctx context.Context, c *Container)
 		shmPath := c.ShmPath
 		if shmPath != "" {
 			if err := syscall.Unmount(shmPath, syscall.MNT_DETACH); err != nil {
-				log.With(ctx).WithError(err).Warnf("failed to umount shm path %s", shmPath)
+				if mountutils.IsMounted(shmPath) {
+					log.With(ctx).WithError(err).Warnf("failed to umount shm path %s", shmPath)
+				}
 			}
 		}
 	}

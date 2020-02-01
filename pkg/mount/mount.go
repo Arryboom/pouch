@@ -1,6 +1,8 @@
 package mount
 
 import (
+	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,4 +30,32 @@ func IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// IsMounted checks if file path is mounted
+func IsMounted(file string) bool {
+	if _, err := os.Stat(file); err != nil {
+		return false
+	}
+
+	file = filepath.Clean(file)
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return false
+	}
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+
+		var skipInt int
+		var ftype, source, skipString string
+		fmt.Sscanf(s.Text(), "%d %d %d:%d %s %s %s",
+			&skipInt, &skipInt, &skipInt, &skipInt, &ftype, &source, &skipString)
+
+		if filepath.Clean(source) == file {
+			return true
+		}
+	}
+
+	return false
 }
