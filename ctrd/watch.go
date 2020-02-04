@@ -100,7 +100,8 @@ func (w *watch) add(ctx context.Context, pack *containerPack) {
 		// stop unexpected, judge whether channel is broken, if does, skip this message,
 		// since task still running
 		if isChannelClosed(status) {
-			log.With(ctx).Warnf("receive exit message since channel broken, %+v", status)
+			log.With(ctx).Warnf("receive exit message since channel broken, %s %v %v %v",
+				pack.id, status.Error(), status.ExitCode(), status.ExitTime())
 			return
 		}
 
