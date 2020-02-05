@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/pouch/pkg/meta"
 	"github.com/alibaba/pouch/pkg/reference"
 	pkgstreams "github.com/alibaba/pouch/pkg/streams"
+	"github.com/alibaba/pouch/pkg/system"
 	"github.com/alibaba/pouch/pkg/utils"
 	util_metrics "github.com/alibaba/pouch/pkg/utils/metrics"
 	"github.com/alibaba/pouch/version"
@@ -683,7 +684,11 @@ func (c *CriManager) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			ip = annotations[passthruIP]
 		}
 
-		if ip == "" && sandbox.HostConfig.Runtime != "" && sandbox.HostConfig.Runtime != "runc" {
+		// sometimes GetPodNetworkStatus can get host ip, we should skip this, or pod get host ip
+		hostIP := system.GetNodeIP()
+		if (ip == "" || ip == hostIP) &&
+			sandbox.HostConfig.Runtime != "" &&
+			sandbox.HostConfig.Runtime != "runc" {
 			ip = sandboxMeta.IP
 		}
 	}
