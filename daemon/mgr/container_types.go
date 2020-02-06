@@ -108,6 +108,15 @@ const (
 	DefaultSHMSize int64 = 67108864
 )
 
+const (
+	// RestartPolicyNo  NO
+	RestartPolicyNo = "no"
+	// RestartPolicyAlways  ALWAYS
+	RestartPolicyAlways = "always"
+	// RestartPolicyOnFailure ON_FAILURE
+	RestartPolicyOnFailure = "on-failure"
+)
+
 // ContainerFilter defines a function to filter
 // container in the store.
 type ContainerFilter func(*Container) bool
@@ -617,12 +626,22 @@ func (c *Container) GetSnapshotter(key string) string {
 // ContainerRestartPolicy represents the policy is used to manage container.
 type ContainerRestartPolicy types.RestartPolicy
 
-// IsNone returns the container don't need to be restarted or not.
+// IsNone returns the container restart policy is none.
 func (p ContainerRestartPolicy) IsNone() bool {
-	return p.Name == "" || p.Name == "no"
+	return p.Name == "" || p.Name == RestartPolicyNo
 }
 
-// IsAlways returns the container need to be restarted or not.
+// IsAlways returns the container restart policy is always, and need to be restarted.
 func (p ContainerRestartPolicy) IsAlways() bool {
-	return p.Name == "always"
+	return p.Name == RestartPolicyAlways
+}
+
+// IsOnfailure returns the container restart policy is on-failure.
+func (p ContainerRestartPolicy) IsOnfailure() bool {
+	return p.Name == RestartPolicyOnFailure
+}
+
+// Get returns policy name
+func (p ContainerRestartPolicy) Get() string {
+	return p.Name
 }

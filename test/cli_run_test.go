@@ -147,6 +147,32 @@ func (suite *PouchRunSuite) TestRunRestartPolicyNone(c *check.C) {
 	}
 }
 
+// TestRunRestartPolicyOnFailure is to verify restart policy on-failure works.
+func (suite *PouchRunSuite) TestRunRestartPolicyOnFailure(c *check.C) {
+	name := "TestRunRestartPolicyNone"
+	res := command.PouchRun(
+		"run",
+		"-d",
+		"--name", name,
+		"--restart=on-failure",
+		busyboxImage,
+		"sh", "-c", "echo 'start one time'; sleep 0.1")
+	defer DelContainerForceMultyTime(c, name)
+	res.Assert(c, icmd.Success)
+
+	time.Sleep(2 * time.Second)
+
+	output := command.PouchRun("logs", name).Stdout()
+	lines, err := util.StringSliceTrimSpace(strings.Split(output, "\n"))
+	if err != nil {
+		c.Errorf("failed to call StringSliceTrimSpace: %v", err)
+	}
+
+	if len(lines) != 1 {
+		c.Errorf("container should not restart when use on-onfailure, and container exit true, but we got %+v", lines)
+	}
+}
+
 // TestRunWithIPCMode is to verify --specific IPC mode when running a container.
 func (suite *PouchRunSuite) TestRunWithIPCMode(c *check.C) {
 	name := "test-run-with-ipc-mode"

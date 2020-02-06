@@ -2094,10 +2094,33 @@ func (mgr *ContainerManager) exitedAndRelease(id string, m *ctrd.Message, cleanu
 		policy := (*ContainerRestartPolicy)(c.HostConfig.RestartPolicy)
 		keys := c.DetachKeys
 
-		if policy == nil || policy.IsNone() {
+		// only restart policy equal alway, container need to be restarted
+		if policy == nil {
 			return nil
 		}
 
+		switch policy.Get() {
+		// empty or "no" restart policy, do not restart container
+		case "", RestartPolicyNo:
+			return nil
+
+		// "on-failure" restart policy, if container exit code not equal 0,
+		// restart container
+		case RestartPolicyOnFailure:
+			if c.ExitCode() == 0 {
+				return nil
+			}
+
+		// "always" restart policy, restart container
+		case RestartPolicyAlways:
+			break
+
+		// unsupport restart policy, not restart container
+		default:
+			return nil
+		}
+
+		log.With(ctx).Infof("with restart policy (%s), restart container %s", policy.Get(), c.ID)
 		return mgr.start(ctx, c, &types.ContainerStartOptions{DetachKeys: keys})
 	}))
 
