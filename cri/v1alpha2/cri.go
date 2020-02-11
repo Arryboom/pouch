@@ -29,7 +29,6 @@ import (
 	"github.com/alibaba/pouch/pkg/meta"
 	"github.com/alibaba/pouch/pkg/reference"
 	pkgstreams "github.com/alibaba/pouch/pkg/streams"
-	"github.com/alibaba/pouch/pkg/system"
 	"github.com/alibaba/pouch/pkg/utils"
 	util_metrics "github.com/alibaba/pouch/pkg/utils/metrics"
 	"github.com/alibaba/pouch/version"
@@ -674,21 +673,19 @@ func (c *CriManager) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	var ip string
 	// No need to get ip for host network mode.
 	if !hostNet {
-		ip, err = c.CniMgr.GetPodNetworkStatus(containerNetns(sandbox))
-		if err != nil {
-			// Maybe the pod has been stopped.
-			log.With(ctx).Warnf("failed to get ip from %s of sandbox %q: %v", containerNetns(sandbox), podSandboxID, err)
+		if sandbox.HostConfig.Runtime != "" && sandbox.HostConfig.Runtime != "runc" {
+			if v, exist := annotations[passthruKey]; exist && v == "true" {
+				ip = annotations[passthruIP]
+			}
+		} else {
+			ip, err = c.CniMgr.GetPodNetworkStatus(containerNetns(sandbox))
+			if err != nil {
+				// Maybe the pod has been stopped.
+				log.With(ctx).Warnf("failed to get ip from %s of sandbox %q: %v", containerNetns(sandbox), podSandboxID, err)
+			}
 		}
 
-		if v, exist := annotations[passthruKey]; exist && v == "true" {
-			ip = annotations[passthruIP]
-		}
-
-		// sometimes GetPodNetworkStatus can get host ip, we should skip this, or pod get host ip
-		hostIP := system.GetNodeIP()
-		if (ip == "" || ip == hostIP) &&
-			sandbox.HostConfig.Runtime != "" &&
-			sandbox.HostConfig.Runtime != "runc" {
+		if ip == "" {
 			ip = sandboxMeta.IP
 		}
 	}
