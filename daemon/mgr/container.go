@@ -974,9 +974,18 @@ func (mgr *ContainerManager) createContainerdContainer(ctx context.Context, c *C
 	if err := mgr.Client.CreateContainer(ctx, ctrdContainer, checkpointDir); err != nil {
 		log.With(ctx).Errorf("failed to create new containerd container: %v", err)
 
+		var exitCode uint32
+		errDesc := err.Error()
+		if strings.Contains(errDesc, "executable file not found") ||
+			strings.Contains(errDesc, "no such file or directory") ||
+			strings.Contains(errDesc, "system cannot find the file specified") {
+			exitCode = 127
+		} else if strings.Contains(errDesc, syscall.EACCES.Error()) {
+			exitCode = 126
+		}
 		// TODO(ziren): markStoppedAndRelease may failed
 		// we should clean resources of container when start failed
-		_ = mgr.markExitedAndRelease(ctx, c, nil)
+		_ = mgr.markExitedAndRelease(ctx, c, ctrd.NewMessage(exitCode, time.Now(), err))
 		return err
 	}
 

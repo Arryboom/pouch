@@ -20,6 +20,11 @@ type Message struct {
 	err      error
 }
 
+// NewMessage makes message object.
+func NewMessage(exitCode uint32, exitTime time.Time, err error) *Message {
+	return &Message{exitCode: exitCode, exitTime: exitTime, err: err}
+}
+
 // RawError returns the error contained in Message.
 func (m *Message) RawError() error {
 	return m.err

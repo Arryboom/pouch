@@ -376,3 +376,18 @@ func (suite *PouchStartSuite) TestStartContainerTwice(c *check.C) {
 	command.PouchRun("start", name).Assert(c, icmd.Success)
 	command.PouchRun("start", name).Assert(c, icmd.Success)
 }
+
+func (suite *PouchStartSuite) TestStartWithNonExistCmd(c *check.C) {
+	name := "TestStartWithNonExistCmd"
+	res := command.PouchRun("run", "-d", "--name", name, busyboxImage, "abc")
+
+	defer DelContainerForceMultyTime(c, name)
+
+	res = command.PouchRun("inspect", "-f", "{{.State.ExitCode}}", name)
+	res.Assert(c, icmd.Success)
+
+	stdout := strings.TrimSpace(res.Stdout())
+	if stdout != "127" {
+		c.Fatalf("expect exit code: 127, get: %s", stdout)
+	}
+}
