@@ -1665,9 +1665,14 @@ func (mgr *ContainerManager) Top(ctx context.Context, name string, psArgs string
 		return nil, fmt.Errorf("container %s is not running or paused, cannot execute top command", c.ID)
 	}
 
-	pids, err := mgr.Client.ContainerPIDs(ctx, c.ID)
+	processInfos, err := mgr.Client.ContainerPIDs(ctx, c.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get pids of container %s", c.ID)
+	}
+
+	var pids []int
+	for _, p := range processInfos {
+		pids = append(pids, int(p.Pid))
 	}
 
 	output, err := exec.Command("ps", strings.Split(psArgs, " ")...).Output()

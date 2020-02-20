@@ -40,7 +40,7 @@ type ContainerAPIClient interface {
 	// ProbeContainer probe the container's status, if timeout <= 0, will block to receive message.
 	ProbeContainer(ctx context.Context, id string, timeout time.Duration) *Message
 	// ContainerPIDs returns the all processes's ids inside the container.
-	ContainerPIDs(ctx context.Context, id string) ([]int, error)
+	ContainerPIDs(ctx context.Context, id string) ([]containerd.ProcessInfo, error)
 	// ContainerPID returns the container's init process id.
 	ContainerPID(ctx context.Context, id string) (int, error)
 	// ContainerStatus returns the status of container.

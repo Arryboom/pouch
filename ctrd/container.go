@@ -240,7 +240,7 @@ func (c *Client) containerPID(ctx context.Context, id string) (int, error) {
 }
 
 // ContainerPIDs returns the all processes's ids inside the container.
-func (c *Client) ContainerPIDs(ctx context.Context, id string) ([]int, error) {
+func (c *Client) ContainerPIDs(ctx context.Context, id string) ([]containerd.ProcessInfo, error) {
 	pids, err := c.containerPIDs(ctx, id)
 	if err != nil {
 		return pids, convertCtrdErr(err)
@@ -249,7 +249,7 @@ func (c *Client) ContainerPIDs(ctx context.Context, id string) ([]int, error) {
 }
 
 // containerPIDs returns the all processes's ids inside the container.
-func (c *Client) containerPIDs(ctx context.Context, id string) ([]int, error) {
+func (c *Client) containerPIDs(ctx context.Context, id string) ([]containerd.ProcessInfo, error) {
 	if !c.lock.TrylockWithRetry(ctx, id) {
 		return nil, errtypes.ErrLockfailed
 	}
@@ -265,12 +265,7 @@ func (c *Client) containerPIDs(ctx context.Context, id string) ([]int, error) {
 		return nil, errors.Wrap(err, "failed to get task's pids")
 	}
 
-	// convert []uint32 to []int.
-	list := make([]int, 0, len(processes))
-	for _, ps := range processes {
-		list = append(list, int(ps.Pid))
-	}
-	return list, nil
+	return processes, nil
 }
 
 // ContainerStatus returns the status of container.

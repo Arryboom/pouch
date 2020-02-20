@@ -2,6 +2,7 @@ package v1alpha2
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	runtime "github.com/alibaba/pouch/cri/apis/v1alpha2"
 	"github.com/alibaba/pouch/cri/stream"
 	metatypes "github.com/alibaba/pouch/cri/v1alpha2/types"
+	"github.com/alibaba/pouch/ctrd"
 	"github.com/alibaba/pouch/daemon/config"
 	"github.com/alibaba/pouch/daemon/mgr"
 	"github.com/alibaba/pouch/pkg/errtypes"
@@ -27,6 +29,7 @@ import (
 	"github.com/alibaba/pouch/pkg/netutils"
 	"github.com/alibaba/pouch/pkg/randomid"
 	"github.com/alibaba/pouch/pkg/utils"
+	google_protobuf "github.com/gogo/protobuf/types"
 
 	"github.com/cri-o/ocicni/pkg/ocicni"
 	"github.com/go-openapi/strfmt"
@@ -1374,4 +1377,70 @@ func applyContainerConfigByAnnotation(annotations map[string]string, config *api
 	}
 
 	return nil
+}
+
+// processSummary summarize process info from container.
+type processSummary struct {
+	// InitPid is the system specific process id for init process.
+	InitPid uint32 `json:"initPid"`
+	// Processes is a list of system specific process ids inside the container.
+	Processes []processInfo `json:"processes"`
+}
+
+// processInfo mirrors containerd.ProcessInfo
+type processInfo struct {
+	// Pid is the process ID
+	Pid uint32 `json:"pid"`
+	// Info includes additional process information
+	Info *google_protobuf.Any `json:"info"`
+}
+
+func (c *CriManager) getVerboseInfo(ctx context.Context, id string) (map[string]string, error) {
+	verboseMap := make(map[string]string)
+
+	procSummary, err := getContainerProcessSummary(ctx, c.CtrdCli, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get process summary: %v", err)
+	}
+
+	bs, err := json.Marshal(procSummary)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal container %s processInfo: %v", id, err)
+	}
+	verboseMap["processInfo"] = string(bs)
+
+	return verboseMap, nil
+}
+
+func getContainerProcessSummary(ctx context.Context, client ctrd.APIClient, id string) (processSummary, error) {
+	initPid, err := client.ContainerPID(ctx, id)
+	if err != nil {
+		if errtypes.IsNotfound(err) {
+			return processSummary{}, nil
+		}
+		return processSummary{}, err
+	}
+	processes, err := client.ContainerPIDs(ctx, id)
+	if err != nil {
+		if errtypes.IsNotfound(err) {
+			return processSummary{
+				InitPid: uint32(initPid),
+			}, nil
+		}
+		return processSummary{}, err
+	}
+
+	ps := processSummary{
+		InitPid:   uint32(initPid),
+		Processes: make([]processInfo, 0, len(processes)),
+	}
+	for idx := range processes {
+		proc := processes[idx]
+		ps.Processes = append(ps.Processes, processInfo{
+			Pid:  proc.Pid,
+			Info: proc.Info,
+		})
+	}
+
+	return ps, nil
 }

@@ -1088,9 +1088,19 @@ func (c *CriManager) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	}
 	status.Resources.OomScoreAdj = container.HostConfig.OomScoreAdj
 
+	res := &runtime.ContainerStatusResponse{Status: status}
+
+	if r.GetVerbose() {
+		verboseMap, err := c.getVerboseInfo(ctx, r.GetContainerId())
+		if err != nil {
+			return nil, err
+		}
+		res.Info = verboseMap
+	}
+
 	metrics.ContainerSuccessActionsCounter.WithLabelValues(label).Inc()
 
-	return &runtime.ContainerStatusResponse{Status: status}, nil
+	return res, nil
 }
 
 // ContainerStats returns stats of the container. If the container does not
