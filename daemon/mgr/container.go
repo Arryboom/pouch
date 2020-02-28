@@ -1102,11 +1102,16 @@ func (mgr *ContainerManager) stop(ctx context.Context, c *Container, timeout int
 
 	err = mgr.destroyContainer(ctx, c, timeout)
 	if err != nil {
-		if errtypes.IsTimeout(err) || errtypes.IsNotfound(err) {
-			// don't make stopped status and release container network
+		if errtypes.IsNotfound(err) {
+			log.With(ctx).Warnf("destroy container, task is not found")
 			return nil
+		} else if !errtypes.IsTimeout(err) {
+			// don't make stopped status and release container network
+			log.With(ctx).Errorf("failed to destroy container with err(%v)", err)
+			return err
 		}
-		return err
+
+		log.With(ctx).Warnf("destroy container with timeout")
 	}
 
 	if err := mgr.waitExit(ctx, c, timeout); err != nil && !errtypes.IsTimeout(err) {

@@ -452,23 +452,28 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 	defer cancel()
 	if err = pack.task.Kill(nCtx, syscall.SIGTERM, containerd.WithKillAll); err != nil {
 		if errdefs.IsNotFound(err) {
+			log.With(ctx).Warnf("killing task is not fond")
 			return err
 		}
+
+		log.With(ctx).Warnf("failed to send sigterm(15) to kill, try to send sigkill(9) to container again, err(%v)", err)
 
 		// retry with kill 9
 		nCtxForce, cancelForce := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancelForce()
 		if err = pack.task.Kill(nCtxForce, syscall.SIGKILL, containerd.WithKillAll); err != nil {
 			if errdefs.IsNotFound(err) {
+				log.With(ctx).Warnf("killing task is not fond")
 				return err
 			}
+
+			log.With(ctx).Warnf("failed to send sigkill(9) to kill, err(%v)", err)
+
 			// force to kill containerd-shim and all container's threads
 			if err = c.forceDestroyContainer(ctx, pack.id); err != nil {
 				return errors.Wrap(err, "failed to force destroy container")
 			}
 		}
-
-		return err
 	}
 
 	// wait for the task to exit.
@@ -480,8 +485,12 @@ func (c *Client) destroyContainer(ctx context.Context, id string, timeout int64)
 		// timeout, use SIGKILL to retry.
 		if err = pack.task.Kill(ctx, syscall.SIGKILL, containerd.WithKillAll); err != nil {
 			if errdefs.IsNotFound(err) {
+				log.With(ctx).Warnf("killing task is not fond")
 				return err
 			}
+
+			log.With(ctx).Warnf("failed to send sigkill(9) to kill, err(%v)", err)
+
 			// force to kill containerd-shim and all container's threads
 			if err = c.forceDestroyContainer(ctx, pack.id); err != nil {
 				return errors.Wrap(err, "failed to force destroy container")
