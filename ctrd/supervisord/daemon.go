@@ -145,7 +145,7 @@ func (d *Daemon) healthPostCheck(ctx context.Context) error {
 
 	// shim v2 has a connect timeout, enlarge the postcheck timeout
 	for ; failureCount < maxRetryCount; failureCount++ {
-		time.Sleep(time.Duration(failureCount) * time.Second)
+		time.Sleep(500 * time.Millisecond * time.Duration(failureCount))
 
 		if client == nil {
 			client, err = containerd.New(d.Address())
@@ -309,8 +309,11 @@ func (d *Daemon) monitor(ctx context.Context) {
 		}
 
 		if count > maxRetryCount {
-			log.With(ctx).Warnf("failed to restart containerd in time and exit whole process")
-			os.Exit(1)
+			log.With(ctx).Errorf("failed to check containerd health in time and exit whole process")
+			if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+				os.Exit(1)
+			}
+			return
 		}
 
 		pid, err := d.getContainerdPid()
@@ -336,12 +339,12 @@ func (d *Daemon) monitor(ctx context.Context) {
 				}
 			}
 
-			count++
-			if err := d.runContainerd(ctx); err != nil {
-				log.With(ctx).Warnf("failed to restart containerd and will retry it again: %v", err)
-				time.Sleep(delayRetryTimeout)
-				continue
+			// send sigterm to self to stop
+			log.With(ctx).Errorf("failed to check containerd health and exit whole process")
+			if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+				os.Exit(1)
 			}
+			return
 		}
 
 		if err := d.healthPostCheck(ctx); err != nil {
