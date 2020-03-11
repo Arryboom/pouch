@@ -1149,6 +1149,11 @@ func (mgr *ContainerManager) Restart(ctx context.Context, name string, timeout i
 			log.With(ctx).Errorf(ex.Error())
 			return ex
 		}
+		// re-check container state, if timeout error, since exit hook and stop are async,
+		// start may do first, and then exit hook
+		if !c.IsExited() {
+			return fmt.Errorf("failed to stop %s in restarting", c.ID)
+		}
 	}
 
 	log.With(ctx).Debugf("start container %s when restarting", c.ID)
